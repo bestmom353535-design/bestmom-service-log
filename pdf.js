@@ -1,8 +1,7 @@
 (() => {
   const PAGE_W = 595, PAGE_H = 842, SCALE = 2;
-  const COLS = [143.6, 226.8, 305.6, 386.6, 467.6, 559.0];
-  const DATE_X = [161.414, 242.464, 322.314, 403.314, 489.814];
-  const CHECK_X = [145.6, 228.7, 307.5, 388.4, 469.4];
+  const COLS = [143.78, 226.73, 305.57, 386.59, 467.50, 558.94];
+  const CHECK_X = [145.56, 228.60, 307.44, 388.32, 469.32];
   const ML_LABEL_X = [197.09, 280.01, 358.87, 439.78, 520.78];
   const headerRects = {
     mother_name:[143.6,68.0,226.8,92.9],
@@ -18,9 +17,9 @@
     breast:{'울혈':239.40,'통증':254.28,'이상없음':269.40},
     urine:{'불편감':286.56,'이상없음':301.44},
     sitz:{'실시':318.24,'미실시':333.12},
-    sleep:{'잘잠':414.60,'잘못잠':428.88},
-    stool:{'정상변':513.00,'이상변':528.96},
-    bath:{'실시':545.28,'미실시':560.52}
+    sleep:{'잘잠':415.0,'잘못잠':429.5},
+    stool:{'정상변':513.0,'이상변':528.7},
+    bath:{'실시':545.7,'미실시':560.8}
   };
   const laterChecks = {
     ...page1Checks,
@@ -33,7 +32,7 @@
 
   function stage(text) {
     const el = document.getElementById('runtimeStatus');
-    if (el) el.textContent = 'PDF 새 엔진 · ' + text;
+    if (el) el.textContent = 'PDF 좌표보정 · ' + text;
   }
 
   function fmtDate(value) {
@@ -47,7 +46,7 @@
     ctx.fillStyle = '#111';
   }
 
-  function centerText(ctx, text, rect, size = 9, weight = 400) {
+  function centerText(ctx, text, rect, size = 10.5, weight = 400) {
     if (text === null || text === undefined || text === '') return;
     setFont(ctx, size, weight);
     ctx.textAlign = 'center';
@@ -55,7 +54,7 @@
     ctx.fillText(String(text), (rect[0] + rect[2]) / 2, (rect[1] + rect[3]) / 2, Math.max(1, rect[2] - rect[0] - 6));
   }
 
-  function baselineText(ctx, text, x, y, size = 9, align = 'left') {
+  function baselineText(ctx, text, x, y, size = 10.2, align = 'left') {
     if (text === null || text === undefined || text === '') return;
     setFont(ctx, size);
     ctx.textAlign = align;
@@ -88,49 +87,74 @@
     ctx.fillText(clean, rect[0] + 3.8, (rect[1] + rect[3]) / 2, max);
   }
 
-  function notes(ctx, text, rect) {
-    if (!text) return;
-    const size = 9.65, line = size * 1.15, max = rect[2] - rect[0] - 8;
-    let y = rect[1] + 4;
-    setFont(ctx, size);
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
+  function wrapLines(ctx, text, maxWidth) {
     const lines = [];
     let cur = '';
-    for (const ch of String(text)) {
+    const source = String(text || '').replace(/\r/g, '');
+    for (const ch of source) {
       if (ch === '\n') {
-        if (cur) lines.push(cur.trimStart());
+        lines.push(cur.trimStart());
         cur = '';
         continue;
       }
       const next = cur + ch;
-      if (ctx.measureText(next).width > max && cur) {
+      if (ctx.measureText(next).width > maxWidth && cur) {
         lines.push(cur.trimStart());
-        cur = ch;
+        cur = ch === ' ' ? '' : ch;
       } else {
         cur = next;
       }
     }
-    if (cur) lines.push(cur.trimStart());
-    for (const lineText of lines) {
-      if (y + line > rect[3] - 2) break;
-      ctx.fillText(lineText, rect[0] + 4, y, max);
-      y += line;
+    if (cur || !lines.length) lines.push(cur.trimStart());
+    return lines;
+  }
+
+  function notesAutoFit(ctx, text, rect) {
+    if (!text) return;
+    const padX = 4.0, padTop = 3.0, padBottom = 2.0;
+    const maxWidth = rect[2] - rect[0] - padX * 2;
+    const maxHeight = rect[3] - rect[1] - padTop - padBottom;
+    let size = 9.65;
+    let lineRatio = 1.15;
+    let lines = [];
+    let lineHeight = 0;
+
+    while (size >= 5.6) {
+      setFont(ctx, size);
+      lines = wrapLines(ctx, text, maxWidth);
+      lineRatio = size >= 8.5 ? 1.15 : size >= 7.0 ? 1.08 : 1.03;
+      lineHeight = size * lineRatio;
+      if (lines.length * lineHeight <= maxHeight) break;
+      size -= 0.25;
+    }
+
+    setFont(ctx, size);
+    lines = wrapLines(ctx, text, maxWidth);
+    lineRatio = size >= 8.5 ? 1.15 : size >= 7.0 ? 1.08 : 1.03;
+    lineHeight = size * lineRatio;
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    let y = rect[1] + padTop;
+    const maxLines = Math.max(1, Math.floor(maxHeight / lineHeight));
+    for (let i = 0; i < Math.min(lines.length, maxLines); i++) {
+      ctx.fillText(lines[i], rect[0] + padX, y, maxWidth);
+      y += lineHeight;
     }
   }
 
-  function drawCheck(ctx, col, y) {
+  function drawCheck(ctx, col, boxTop) {
     const x = CHECK_X[col] + 3.1;
-    const top = y + 2.4;
+    const y = boxTop + 2.4;
     ctx.save();
     ctx.strokeStyle = '#111';
     ctx.lineWidth = 1.35;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.beginPath();
-    ctx.moveTo(x + 0.7, top + 4.3);
-    ctx.lineTo(x + 2.5, top + 6.1);
-    ctx.lineTo(x + 5.9, top + 1.2);
+    ctx.moveTo(x + 0.5, y + 4.6);
+    ctx.lineTo(x + 2.3, y + 6.3);
+    ctx.lineTo(x + 6.0, y + 0.9);
     ctx.stroke();
     ctx.restore();
   }
@@ -189,25 +213,26 @@
     ctx.scale(SCALE, SCALE);
     ctx.clearRect(0, 0, PAGE_W, PAGE_H);
 
-    centerText(ctx, caseData.mother_name, headerRects.mother_name, 9.3);
-    centerText(ctx, fmtDate(caseData.mother_birth_date), headerRects.mother_birth, 9.1);
-    centerText(ctx, caseData.delivery_type, headerRects.delivery, 9.1);
-    centerText(ctx, caseData.baby_name, headerRects.baby_name, 9.3);
-    centerText(ctx, fmtDate(caseData.baby_birth_date), headerRects.baby_birth, 9.1);
-    centerText(ctx, caseData.birth_weight ?? '', headerRects.birth_weight, 9.1);
-    centerText(ctx, caseData.caregiver?.full_name || '', headerRects.worker, 9.3);
+    centerText(ctx, caseData.mother_name, headerRects.mother_name, 10.5);
+    centerText(ctx, fmtDate(caseData.mother_birth_date), headerRects.mother_birth, 10.5);
+    centerText(ctx, caseData.delivery_type, headerRects.delivery, 10.5);
+    centerText(ctx, caseData.baby_name, headerRects.baby_name, 10.5);
+    centerText(ctx, fmtDate(caseData.baby_birth_date), headerRects.baby_birth, 10.5);
+    centerText(ctx, caseData.birth_weight ?? '', headerRects.birth_weight, 10.5);
+    centerText(ctx, caseData.caregiver?.full_name || '', headerRects.worker, 10.5);
 
     const first = pageIndex === 0;
     const checks = first ? page1Checks : laterChecks;
     const pos = first
-      ? {meal:360.0,snack:375.6,temp:399.0,bf:466.7,fc:493.4,ml:506.2,other:[577.32,614.64],notes:[615.36,678.0],sig:[679.06,715.66]}
+      ? {meal:360.0,snack:375.6,temp:399.0,bf:466.7,fc:493.4,ml:506.2,other:[577.9,614.4],notes:[615.36,678.0],sig:[679.06,715.66]}
       : {meal:359.5,snack:375.0,temp:396.8,bf:460.8,fc:484.4,ml:498.3,other:[567.96,605.28],notes:[606.0,668.64],sig:[669.70,706.30]};
 
     const pageRecords = (records || []).filter((r) => Math.floor((Number(r.service_day) - 1) / 5) === pageIndex);
     for (const r of pageRecords) {
       const col = (Number(r.service_day) - 1) % 5;
       const left = COLS[col], right = COLS[col + 1];
-      baselineText(ctx, fmtDate(r.service_date), DATE_X[col], 163.5, 8.4);
+
+      centerText(ctx, fmtDate(r.service_date), [left,145.9,right,176.0], 10.2);
 
       for (const v of r.incision_status || []) if (checks.incision[v] != null) drawCheck(ctx, col, checks.incision[v]);
       for (const v of r.breast_status || []) if (checks.breast[v] != null) drawCheck(ctx, col, checks.breast[v]);
@@ -217,15 +242,22 @@
       if (r.stool_status && checks.stool[r.stool_status] != null) drawCheck(ctx, col, checks.stool[r.stool_status]);
       if (r.bath_cord_status && checks.bath[r.bath_cord_status] != null) drawCheck(ctx, col, checks.bath[r.bath_cord_status]);
 
-      baselineText(ctx, countText(r.meal_count), left + 49.5, pos.meal, 9);
-      baselineText(ctx, countText(r.snack_count), left + 49.5, pos.snack, 9);
-      baselineText(ctx, r.baby_temp ?? '', left + 30, pos.temp, 9);
-      baselineText(ctx, countText(r.breastfeed_count), left + 35.5, pos.bf, 9);
-      baselineText(ctx, countText(r.formula_count), left + 39, pos.fc, 9);
-      baselineText(ctx, countText(r.formula_ml), ML_LABEL_X[col] - 4, pos.ml, 9, 'right');
+      baselineText(ctx, countText(r.meal_count), left + 49.5, pos.meal, 10.2);
+      baselineText(ctx, countText(r.snack_count), left + 49.5, pos.snack, 10.2);
+      baselineText(ctx, r.baby_temp ?? '', left + 30.0, pos.temp, 10.2);
+      baselineText(ctx, countText(r.breastfeed_count), left + 35.5, pos.bf, 10.2);
+      baselineText(ctx, countText(r.formula_count), left + 39.0, pos.fc, 10.2);
+
+      const mlValue = countText(r.formula_ml);
+      if (mlValue) {
+        setFont(ctx, 10.2);
+        const gap = mlValue.length >= 3 ? 8.8 : 7.2;
+        const textWidth = ctx.measureText(mlValue).width;
+        baselineText(ctx, mlValue, ML_LABEL_X[col] - gap - textWidth, pos.ml, 10.2);
+      }
 
       oneLine(ctx, r.other_service, [left, pos.other[0], right, pos.other[1]]);
-      notes(ctx, r.notes, [left, pos.notes[0], right, pos.notes[1]]);
+      notesAutoFit(ctx, r.notes, [left, pos.notes[0], right, pos.notes[1]]);
       await drawSignature(ctx, r.signature_data, [left, pos.sig[0], right, pos.sig[1]], r.service_day);
     }
 
