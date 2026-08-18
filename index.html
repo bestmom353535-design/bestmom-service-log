@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
   <title>베스트맘 제공기록</title>
-  <link rel="stylesheet" href="style.css?v=20260818-2303">
+  <link rel="stylesheet" href="style.css?v=20260818-2314">
 </head>
 <body>
   <div id="loginView" class="wrap login">
@@ -15,7 +15,7 @@
       <div class="mt"><label>비밀번호</label><input id="loginPw" type="password" autocomplete="current-password"></div>
       <button id="loginBtn" class="primary full mt">로그인</button>
       <div id="loginMsg" class="muted mt">연결 확인 중...</div>
-      <div class="muted mt tiny">화면 버전 2026-08-18 23:03</div>
+      <div class="muted mt tiny">화면 버전 2026-08-18 23:14</div>
     </div>
   </div>
 
@@ -34,7 +34,7 @@
 
   <script>
   (() => {
-    const VER = '20260818-2303';
+    const VER = '20260818-2314';
     let lastError = '';
     const getMsg = () => document.getElementById('loginMsg');
     const setMsg = (text) => { const el = getMsg(); if (el) el.textContent = text; };
@@ -67,6 +67,18 @@
       });
     }
 
+    function finishAppStart() {
+      setTimeout(() => {
+        const btn = document.getElementById('loginBtn');
+        if (btn && typeof btn.onclick === 'function') {
+          setMsg('준비 완료 · 로그인해주세요.');
+          loadPdfTools();
+        } else {
+          setMsg('앱 시작 오류' + (lastError ? ': ' + lastError : ' · 로그인 기능을 연결하지 못했습니다.'));
+        }
+      }, 0);
+    }
+
     function startApp() {
       if (!window.supabase || typeof window.supabase.createClient !== 'function') {
         setMsg('Supabase 연결 모듈을 불러오지 못했습니다.');
@@ -74,15 +86,7 @@
       }
       setMsg('연결 모듈 준비됨 · 앱 시작 중...');
       loadScript('app.js?v=' + VER, () => {
-        setTimeout(() => {
-          const btn = document.getElementById('loginBtn');
-          if (btn && typeof btn.onclick === 'function') {
-            setMsg('준비 완료 · 로그인해주세요.');
-            loadPdfTools();
-          } else {
-            setMsg('앱 시작 오류' + (lastError ? ': ' + lastError : ' · 로그인 기능을 연결하지 못했습니다.'));
-          }
-        }, 0);
+        loadScript('unlock-fix.js?v=' + VER, finishAppStart, finishAppStart);
       }, () => setMsg('앱 파일을 불러오지 못했습니다.'));
     }
 
