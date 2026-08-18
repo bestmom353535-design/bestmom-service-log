@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
   <title>베스트맘 제공기록</title>
-  <link rel="stylesheet" href="style.css?v=20260818-pdf2">
+  <link rel="stylesheet" href="style.css?v=20260819-pdf3">
 </head>
 <body>
   <div id="loginView" class="wrap login">
@@ -20,7 +20,7 @@
       <div class="muted tiny">개인 휴대폰에서만 사용해주세요. 비밀번호 자체는 별도로 저장하지 않습니다.</div>
       <button id="loginBtn" class="primary full mt">로그인</button>
       <div id="loginMsg" class="muted mt">연결 확인 중...</div>
-      <div class="muted mt tiny">앱 버전 PDF-2</div>
+      <div class="muted mt tiny">앱 버전 PDF-3</div>
     </div>
   </div>
 
@@ -29,7 +29,7 @@
       <div>
         <div class="brand">베스트맘 제공기록</div>
         <div id="who" class="muted"></div>
-        <div id="runtimeStatus" class="muted tiny">PDF 새 엔진 · 준비 중</div>
+        <div id="runtimeStatus" class="muted tiny">PDF 좌표보정 · 준비 중</div>
       </div>
       <button id="logoutBtn" class="secondary">로그아웃</button>
     </div>
@@ -43,7 +43,7 @@
 
   <script>
   (() => {
-    const VER = '20260818-pdf2';
+    const VER = '20260819-pdf3';
     const PROJECT_REF = 'chbxwvsetyvzhxdfmzdj';
     let lastError = '';
 
@@ -91,26 +91,26 @@
     }
 
     function loadPdfModule() {
-      setRuntime('PDF 새 엔진 · 모듈 불러오는 중');
+      setRuntime('PDF 좌표보정 · 모듈 불러오는 중');
       loadScript('pdf.js?v=' + VER, () => {
         if (typeof window.makePdf === 'function') {
-          setRuntime('PDF 새 엔진 · 준비 완료');
+          setRuntime('PDF 좌표보정 · 준비 완료');
         } else {
-          setRuntime('PDF 새 엔진 · 시작 실패');
+          setRuntime('PDF 좌표보정 · 시작 실패');
           window.makePdf = () => window.alert('PDF 기능을 시작하지 못했습니다. 화면을 새로고침해주세요.');
         }
       }, () => {
-        setRuntime('PDF 새 엔진 · 파일 로딩 실패');
+        setRuntime('PDF 좌표보정 · 파일 로딩 실패');
         window.makePdf = () => window.alert('PDF 파일을 불러오지 못했습니다. 화면을 새로고침해주세요.');
       });
     }
 
     function loadPdfTools() {
-      setRuntime('PDF 새 엔진 · 라이브러리 연결 중');
+      setRuntime('PDF 좌표보정 · 라이브러리 연결 중');
       loadScript('https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js', loadPdfModule, () => {
-        setRuntime('PDF 새 엔진 · 라이브러리 재시도 중');
+        setRuntime('PDF 좌표보정 · 라이브러리 재시도 중');
         loadScript('https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js', loadPdfModule, () => {
-          setRuntime('PDF 새 엔진 · 라이브러리 연결 실패');
+          setRuntime('PDF 좌표보정 · 라이브러리 연결 실패');
           window.makePdf = () => window.alert('PDF 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인해주세요.');
         });
       });
