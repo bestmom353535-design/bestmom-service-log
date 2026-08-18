@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
   <title>베스트맘 제공기록</title>
-  <link rel="stylesheet" href="style.css?v=20260818-2314">
+  <link rel="stylesheet" href="style.css?v=20260818-2321">
 </head>
 <body>
   <div id="loginView" class="wrap login">
@@ -15,7 +15,7 @@
       <div class="mt"><label>비밀번호</label><input id="loginPw" type="password" autocomplete="current-password"></div>
       <button id="loginBtn" class="primary full mt">로그인</button>
       <div id="loginMsg" class="muted mt">연결 확인 중...</div>
-      <div class="muted mt tiny">화면 버전 2026-08-18 23:14</div>
+      <div class="muted mt tiny">화면 버전 2026-08-18 23:21</div>
     </div>
   </div>
 
@@ -34,7 +34,7 @@
 
   <script>
   (() => {
-    const VER = '20260818-2314';
+    const VER = '20260818-2321';
     let lastError = '';
     const getMsg = () => document.getElementById('loginMsg');
     const setMsg = (text) => { const el = getMsg(); if (el) el.textContent = text; };
@@ -57,13 +57,25 @@
       document.head.appendChild(s);
     }
 
-    function loadPdfTools() {
-      loadScript('https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js', () => {
-        loadScript('pdf.js?v=' + VER, () => {}, () => {});
+    function loadPdfModule() {
+      loadScript('pdf-compat.js?v=' + VER, () => {
+        loadScript('pdf.js?v=' + VER, () => {
+          if (typeof window.makePdf !== 'function') {
+            window.makePdf = () => window.alert('PDF 기능을 시작하지 못했습니다. 화면을 새로고침해주세요.');
+          }
+        }, () => {
+          window.makePdf = () => window.alert('PDF 파일을 불러오지 못했습니다. 화면을 새로고침해주세요.');
+        });
       }, () => {
-        loadScript('https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js', () => {
-          loadScript('pdf.js?v=' + VER, () => {}, () => {});
-        }, () => {});
+        window.makePdf = () => window.alert('PDF 보조 기능을 불러오지 못했습니다. 화면을 새로고침해주세요.');
+      });
+    }
+
+    function loadPdfTools() {
+      loadScript('https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js', loadPdfModule, () => {
+        loadScript('https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js', loadPdfModule, () => {
+          window.makePdf = () => window.alert('PDF 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인해주세요.');
+        });
       });
     }
 
