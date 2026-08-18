@@ -17,9 +17,9 @@
     breast:{'울혈':239.40,'통증':254.28,'이상없음':269.40},
     urine:{'불편감':286.56,'이상없음':301.44},
     sitz:{'실시':318.24,'미실시':333.12},
-    sleep:{'잘잠':415.0,'잘못잠':429.5},
-    stool:{'정상변':513.0,'이상변':528.7},
-    bath:{'실시':545.7,'미실시':560.8}
+    sleep:{'잘잠':409.80,'잘못잠':424.08},
+    stool:{'정상변':504.36,'이상변':519.60},
+    bath:{'실시':535.92,'미실시':551.16}
   };
   const laterChecks = {
     ...page1Checks,
@@ -224,7 +224,7 @@
     const first = pageIndex === 0;
     const checks = first ? page1Checks : laterChecks;
     const pos = first
-      ? {meal:360.0,snack:375.6,temp:399.0,bf:466.7,fc:493.4,ml:506.2,other:[577.9,614.4],notes:[615.36,678.0],sig:[679.06,715.66]}
+      ? {meal:360.0,snack:375.6,temp:399.0,bf:460.8,fc:484.4,ml:498.3,other:[567.96,605.28],notes:[606.0,668.64],sig:[669.70,706.30]}
       : {meal:359.5,snack:375.0,temp:396.8,bf:460.8,fc:484.4,ml:498.3,other:[567.96,605.28],notes:[606.0,668.64],sig:[669.70,706.30]};
 
     const pageRecords = (records || []).filter((r) => Math.floor((Number(r.service_day) - 1) / 5) === pageIndex);
