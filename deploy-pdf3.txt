@@ -1,0 +1,2 @@
+Force GitHub Pages deploy for PDF-3 coordinate correction.
+2026-08-19 00:11 KST
