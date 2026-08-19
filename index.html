@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
   <title>베스트맘 제공기록</title>
-  <link rel="stylesheet" href="style.css?v=20260819-app10">
+  <link rel="stylesheet" href="style.css?v=20260819-app11">
 </head>
 <body>
   <div id="loginView" class="wrap login">
@@ -20,7 +20,7 @@
       <div class="muted tiny">개인 휴대폰에서만 사용해주세요. 비밀번호 자체는 별도로 저장하지 않습니다.</div>
       <button id="loginBtn" class="primary full mt">로그인</button>
       <div id="loginMsg" class="muted mt">연결 확인 중...</div>
-      <div class="muted mt tiny">앱 버전 APP-10 · PDF-6</div>
+      <div class="muted mt tiny">앱 버전 APP-11 · PDF-6</div>
     </div>
   </div>
 
@@ -43,7 +43,7 @@
 
   <script>
   (() => {
-    const VER = '20260819-app10';
+    const VER = '20260819-app11';
     const PDF_ENGINE = 'PDF-6.0';
     const PROJECT_REF = 'chbxwvsetyvzhxdfmzdj';
     let lastError = '';
@@ -137,8 +137,12 @@
       }, 0);
     }
 
+    function loadAdminDelete() {
+      loadScript('admin-delete-v11.js?v=' + VER, finishAppStart, finishAppStart);
+    }
+
     function loadAdminSearch() {
-      loadScript('admin-search-v10.js?v=' + VER, finishAppStart, finishAppStart);
+      loadScript('admin-search-v10.js?v=' + VER, loadAdminDelete, loadAdminDelete);
     }
 
     function loadNotesGuide() {
