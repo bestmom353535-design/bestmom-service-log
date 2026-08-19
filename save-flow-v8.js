@@ -3,6 +3,8 @@
   const originalSaveDay = window.saveDay || (typeof saveDay === 'function' ? saveDay : null);
   if (typeof originalOpenDay !== 'function' || typeof originalSaveDay !== 'function') return;
 
+  let suppressNextDateScroll = false;
+
   async function withoutListNavigation(task) {
     const realOpenCase = window.openCase;
     window.openCase = async () => {};
@@ -21,6 +23,16 @@
     }, 80);
   }
 
+  function restoreScrollPosition(top) {
+    const restore = () => window.scrollTo({ top, left: 0, behavior: 'auto' });
+    restore();
+    requestAnimationFrame(() => {
+      restore();
+      requestAnimationFrame(restore);
+    });
+    setTimeout(restore, 120);
+  }
+
   window.openDay = async function improvedDayFlow(day, adminMode) {
     await originalOpenDay(day, adminMode);
 
@@ -29,14 +41,13 @@
       saveButton.onclick = async () => {
         if (saveButton.disabled) return;
         saveButton.disabled = true;
+        const keepScrollY = window.scrollY;
         try {
-          // 기록 저장만 할 때는 현재 일차를 유지한 뒤 바로 서명 영역으로 이동한다.
+          // 기록 저장 후에는 현재 보고 있던 위치를 그대로 유지한다.
           await withoutListNavigation(() => originalSaveDay(day, adminMode, false));
+          suppressNextDateScroll = true;
           await window.openDay(day, adminMode);
-          const sig = document.getElementById('sig');
-          if (sig) {
-            setTimeout(() => sig.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80);
-          }
+          restoreScrollPosition(keepScrollY);
         } finally {
           const currentSave = document.getElementById('save');
           if (currentSave) currentSave.disabled = false;
@@ -50,7 +61,7 @@
         if (signButton.disabled) return;
         signButton.disabled = true;
         try {
-          // 최종 서명·잠금이 끝나면 원래 동작대로 일차 목록으로 복귀한다.
+          // 최종 서명·잠금이 끝나면 일차 목록 위쪽으로 이동한다.
           await originalSaveDay(day, false, true);
           setTimeout(() => {
             const main = document.getElementById('main');
@@ -64,7 +75,8 @@
       };
     }
 
-    // 일차를 선택해 들어오면 서비스 날짜 입력란이 바로 보이도록 이동한다.
-    scrollToServiceDate();
+    // 일차를 처음 선택해 들어올 때만 서비스 날짜 입력란이 바로 보이도록 이동한다.
+    if (suppressNextDateScroll) suppressNextDateScroll = false;
+    else scrollToServiceDate();
   };
 })();
