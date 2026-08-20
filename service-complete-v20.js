@@ -110,9 +110,9 @@
 
   window.openDay = async function openDayWithServiceCompletion(day, adminMode) {
     await previousOpenDay(day, adminMode);
-    if (adminMode || !window.currentCase || day !== Number(window.currentCase.service_days)) return;
+    if (adminMode || !currentCase || day !== Number(currentCase.service_days)) return;
 
-    const caseId = window.currentCase.id;
+    const caseId = currentCase.id;
     const { data: serviceCase, error: caseError } = await sb
       .from('service_cases')
       .select('status')
