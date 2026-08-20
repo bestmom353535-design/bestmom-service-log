@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
   <title>베스트맘 제공기록</title>
-  <link rel="stylesheet" href="style.css?v=20260820-app24">
+  <link rel="stylesheet" href="style.css?v=20260820-app25">
 </head>
 <body>
   <div id="loginView" class="wrap login">
@@ -20,7 +20,7 @@
       <div class="muted tiny">개인 휴대폰에서만 사용해주세요. 비밀번호 자체는 별도로 저장하지 않습니다.</div>
       <button id="loginBtn" class="primary full mt">로그인</button>
       <div id="loginMsg" class="muted mt">연결 확인 중...</div>
-      <div class="muted mt tiny">앱 버전 APP-24 · PDF-6</div>
+      <div class="muted mt tiny">앱 버전 APP-25 · PDF-6</div>
     </div>
   </div>
 
@@ -43,7 +43,7 @@
 
   <script>
   (() => {
-    const VER = '20260820-app24';
+    const VER = '20260820-app25';
     const PDF_ENGINE = 'PDF-6.0';
     const PROJECT_REF = 'chbxwvsetyvzhxdfmzdj';
     let lastError = '';
@@ -181,8 +181,12 @@
       loadScript('unlock-fix.js?v=' + VER, loadSaveFlow, loadSaveFlow);
     }
 
+    function loadAdminSession() {
+      loadScript('admin-session-v25.js?v=' + VER, loadUnlockPatch, loadUnlockPatch);
+    }
+
     function loadCaregiverPin() {
-      loadScript('caregiver-pin-v24.js?v=' + VER, loadUnlockPatch, loadUnlockPatch);
+      loadScript('caregiver-pin-v25.js?v=' + VER, loadAdminSession, loadAdminSession);
     }
 
     function loadAppPatches() {
