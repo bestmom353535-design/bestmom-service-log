@@ -7,7 +7,20 @@
     <button class="primary full mt" data-complete-case="${caseId}" style="margin-top:16px">
       서비스 제공 종료
     </button>
-    <div class="muted tiny" style="margin-top:7px;text-align:center">마지막 일차 기록을 마친 뒤 눌러주세요.</div>`;
+    <div class="muted tiny" style="margin-top:7px;text-align:center">전체 일차 기록을 마친 뒤 눌러주세요.</div>`;
+
+  async function allDaysSaved(caseId, serviceDays) {
+    const { data: records, error } = await sb
+      .from('daily_records')
+      .select('service_day')
+      .eq('case_id', caseId);
+    if (error) return false;
+
+    const savedDays = new Set((records || [])
+      .map((row) => Number(row.service_day))
+      .filter((day) => day >= 1 && day <= Number(serviceDays)));
+    return savedDays.size >= Number(serviceDays);
+  }
 
   async function finishService(caseId, button) {
     const ok = window.confirm('서비스 제공을 종료하시겠습니까?\n\n종료 후에는 내 서비스에 “서비스 완료”로 표시됩니다.');
@@ -93,14 +106,7 @@
       .eq('id', id)
       .single();
     if (caseError || !serviceCase || serviceCase.status !== 'active') return;
-
-    const { data: lastRecord, error: recordError } = await sb
-      .from('daily_records')
-      .select('id')
-      .eq('case_id', id)
-      .eq('service_day', serviceCase.service_days)
-      .maybeSingle();
-    if (recordError || !lastRecord) return;
+    if (!(await allDaysSaved(id, serviceCase.service_days))) return;
 
     const topCard = document.querySelector('#main > .card');
     if (!topCard || topCard.querySelector(`[data-complete-case="${id}"]`)) return;
@@ -115,18 +121,11 @@
     const caseId = currentCase.id;
     const { data: serviceCase, error: caseError } = await sb
       .from('service_cases')
-      .select('status')
+      .select('status,service_days')
       .eq('id', caseId)
       .single();
     if (caseError || !serviceCase || serviceCase.status !== 'active') return;
-
-    const { data: lastRecord, error: recordError } = await sb
-      .from('daily_records')
-      .select('id')
-      .eq('case_id', caseId)
-      .eq('service_day', day)
-      .maybeSingle();
-    if (recordError || !lastRecord) return;
+    if (!(await allDaysSaved(caseId, serviceCase.service_days))) return;
 
     const dayCard = document.querySelector('#day > .card');
     if (!dayCard || dayCard.querySelector(`[data-complete-case="${caseId}"]`)) return;
