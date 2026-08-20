@@ -1,5 +1,5 @@
 (() => {
-  if (!window.sb || !sb.auth || typeof sb.auth.signInWithPassword !== 'function') return;
+  if (typeof sb === 'undefined' || !sb.auth || typeof sb.auth.signInWithPassword !== 'function') return;
 
   const encodePin = (pin) => `BestMom!${pin}#Care`;
   const originalSignIn = sb.auth.signInWithPassword.bind(sb.auth);
