@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
   <title>베스트맘 제공기록</title>
-  <link rel="stylesheet" href="style.css?v=20260821-app27">
+  <link rel="stylesheet" href="style.css?v=20260822-app28">
 </head>
 <body>
   <div id="loginView" class="wrap login">
@@ -20,7 +20,7 @@
       <div class="muted tiny">개인 휴대폰에서만 사용해주세요. 비밀번호 자체는 별도로 저장하지 않습니다.</div>
       <button id="loginBtn" class="primary full mt">로그인</button>
       <div id="loginMsg" class="muted mt">연결 확인 중...</div>
-      <div class="muted mt tiny">앱 버전 APP-27 · PDF-6</div>
+      <div class="muted mt tiny">앱 버전 APP-28 · PDF-6</div>
     </div>
   </div>
 
@@ -34,7 +34,8 @@
       <button id="logoutBtn" class="secondary">로그아웃</button>
     </div>
     <div id="adminNav" class="tabs hidden">
-      <button class="tab active" data-tab="cases">서비스 관리</button>
+      <button class="tab" data-tab="register">산모 등록</button>
+      <button class="tab active" data-tab="cases">서비스 현황</button>
       <button class="tab" data-tab="caregivers">관리사 관리</button>
       <button class="tab" data-tab="template">PDF 원본</button>
     </div>
@@ -43,7 +44,7 @@
 
   <script>
   (() => {
-    const VER = '20260821-app27';
+    const VER = '20260822-app28';
     const PDF_ENGINE = 'PDF-6.0';
     const PROJECT_REF = 'chbxwvsetyvzhxdfmzdj';
     let lastError = '';
@@ -161,8 +162,12 @@
       loadScript('caregiver-sort-v12.js?v=' + VER, loadInputWarning, loadInputWarning);
     }
 
+    function loadAdminMenu() {
+      loadScript('admin-menu-v28.js?v=' + VER, loadCaregiverSort, loadCaregiverSort);
+    }
+
     function loadAdminReopen() {
-      loadScript('admin-reopen-v26.js?v=' + VER, loadCaregiverSort, loadCaregiverSort);
+      loadScript('admin-reopen-v26.js?v=' + VER, loadAdminMenu, loadAdminMenu);
     }
 
     function loadAdminDelete() {
