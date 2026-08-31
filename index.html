@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
   <title>베스트맘 제공기록</title>
-  <link rel="stylesheet" href="style.css?v=20260831-app34">
+  <link rel="stylesheet" href="style.css?v=20260831-app35">
 </head>
 <body>
   <div id="loginView" class="wrap login">
@@ -20,7 +20,7 @@
       <div class="muted tiny">개인 휴대폰에서만 사용해주세요. 비밀번호 자체는 별도로 저장하지 않습니다.</div>
       <button id="loginBtn" class="primary full mt">로그인</button>
       <div id="loginMsg" class="muted mt">연결 확인 중...</div>
-      <div class="muted mt tiny">앱 버전 APP-34 · PDF-6</div>
+      <div class="muted mt tiny">앱 버전 APP-35 · PDF-7</div>
     </div>
   </div>
 
@@ -29,7 +29,7 @@
       <div>
         <div class="brand">베스트맘 제공기록</div>
         <div id="who" class="muted"></div>
-        <div id="runtimeStatus" class="muted tiny">PDF-6.0 엔진 · 준비 중</div>
+        <div id="runtimeStatus" class="muted tiny">PDF-7.0 엔진 · 준비 중</div>
       </div>
       <button id="logoutBtn" class="secondary">로그아웃</button>
     </div>
@@ -45,8 +45,8 @@
 
   <script>
   (() => {
-    const VER = '20260831-app34';
-    const PDF_ENGINE = 'PDF-6.0';
+    const VER = '20260831-app35';
+    const PDF_ENGINE = 'PDF-7.0';
     const PROJECT_REF = 'chbxwvsetyvzhxdfmzdj';
     let lastError = '';
 
@@ -95,13 +95,13 @@
 
     function loadPdfModule() {
       setRuntime(`${PDF_ENGINE} 엔진 · 새 파일 불러오는 중`);
-      loadScript('pdf-v6.js', () => {
+      loadScript('pdf-v7.js', () => {
         if (window.BESTMOM_PDF_ENGINE !== PDF_ENGINE) {
           setRuntime(`PDF 엔진 버전 불일치 · ${window.BESTMOM_PDF_ENGINE || '확인불가'}`);
           window.makePdf = () => window.alert('PDF 엔진 버전이 맞지 않습니다. 화면을 다시 열어주세요.');
           return;
         }
-        loadScript('pdf-save-v6.js', () => {
+        loadScript('pdf-save-v7.js', () => {
           if (typeof window.makePdf === 'function' && typeof window.savePdf === 'function') {
             setRuntime(`${PDF_ENGINE} 엔진 · 준비 완료`);
           } else {
@@ -143,8 +143,12 @@
       loadScript('caregiver-refresh-v29.js?v=' + VER, finishAppStart, finishAppStart);
     }
 
+    function loadAdminUnpaid() {
+      loadScript('admin-unpaid-v35.js?v=' + VER, loadCaregiverRefresh, loadCaregiverRefresh);
+    }
+
     function loadAdminEnded() {
-      loadScript('admin-ended-v32.js?v=' + VER, loadCaregiverRefresh, loadCaregiverRefresh);
+      loadScript('admin-ended-v32.js?v=' + VER, loadAdminUnpaid, loadAdminUnpaid);
     }
 
     function loadAdminRecordControls() {
