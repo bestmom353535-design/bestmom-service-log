@@ -1,6 +1,6 @@
 (() => {
-  if (!globalThis.CanvasRenderingContext2D || window.__BESTMOM_UNPAID_ALIGN_V37__) return;
-  window.__BESTMOM_UNPAID_ALIGN_V37__ = true;
+  if (!globalThis.CanvasRenderingContext2D || window.__BESTMOM_UNPAID_ALIGN_V38__) return;
+  window.__BESTMOM_UNPAID_ALIGN_V38__ = true;
 
   const proto = globalThis.CanvasRenderingContext2D.prototype;
   const originalFillText = proto.fillText;
@@ -10,6 +10,7 @@
 
   const TEXT_Y_SHIFT = 11.4;
   const STAMP_Y_SHIFT = 5.9;
+  const STAMP_RADIUS_GROW = 0.65;
   const STAMP_RED = '#ed1c24';
   const stampFontFamily = 'Arial,"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif';
 
@@ -20,13 +21,14 @@
 
     if (isUnpaidStamp) {
       const correctedY = y - STAMP_Y_SHIFT;
+      const correctedRadius = radius + STAMP_RADIUS_GROW;
       stampState.set(this, {
         cx: x,
         cy: correctedY,
         pendingStroke: true,
         pendingText: true
       });
-      return originalArc.call(this, x, correctedY, radius, startAngle, endAngle, counterclockwise);
+      return originalArc.call(this, x, correctedY, correctedRadius, startAngle, endAngle, counterclockwise);
     }
 
     return originalArc.call(this, x, y, radius, startAngle, endAngle, counterclockwise);
@@ -57,7 +59,6 @@
     const value = String(text ?? '');
     const state = stampState.get(this);
 
-    // 기존 한 줄 '베스트맘'을 없애고 참고 이미지처럼 2행 정자 배치로 다시 그린다.
     if (value === '베스트맘' && state?.pendingText && Number.isFinite(y) && y > 730 && y < 810) {
       const previousFont = this.font;
       const previousAlign = this.textAlign;
@@ -82,7 +83,6 @@
       return;
     }
 
-    // PDF-8 하단 입력값이 실제 원본 활자보다 아래에 보이는 오차를 보정한다.
     if (Number.isFinite(y) && y > 730 && y < 810) {
       const correctedY = y - TEXT_Y_SHIFT;
       const isShortDate = /^\d{1,2}\/\d{1,2}$/.test(value.trim());
@@ -90,7 +90,6 @@
       if (isShortDate) {
         const previousAlign = this.textAlign;
         this.textAlign = 'left';
-        // '일자:' 콜론 바로 뒤에서 시작하도록 고정한다.
         const correctedX = x < 200 ? 68.2 : 337.4;
         try {
           return maxWidth === undefined
