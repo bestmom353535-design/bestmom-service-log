@@ -2,6 +2,24 @@
   const previousOpenDay = window.openDay;
   if (typeof previousOpenDay !== 'function') return;
 
+  function ensureFiveDayOption() {
+    const select = document.getElementById('days');
+    if (!select) return;
+    const hasFive = [...select.options].some((option) => Number(option.value || option.textContent) === 5);
+    if (hasFive) return;
+
+    const option = document.createElement('option');
+    option.value = '5';
+    option.textContent = '5';
+    select.insertBefore(option, select.firstChild);
+  }
+
+  const mainEl = document.getElementById('main');
+  if (mainEl) {
+    new MutationObserver(ensureFiveDayOption).observe(mainEl, { childList: true, subtree: true });
+    ensureFiveDayOption();
+  }
+
   window.openDay = async function caregiverNotesGuide(day, adminMode) {
     await previousOpenDay(day, adminMode);
 
