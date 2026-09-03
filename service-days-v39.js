@@ -15,7 +15,18 @@
     }
   }
 
+  function loadCaregiverPicker() {
+    if (window.__BESTMOM_CAREGIVER_PICKER_LOADING__) return;
+    window.__BESTMOM_CAREGIVER_PICKER_LOADING__ = true;
+    const script = document.createElement('script');
+    script.src = 'caregiver-picker-v43.js?v=20260903-app43';
+    script.async = true;
+    document.head.appendChild(script);
+  }
+
   ensureFiveDayOption();
+  loadCaregiverPicker();
+
   const main = document.getElementById('main');
   if (main) {
     new MutationObserver(ensureFiveDayOption).observe(main, { childList: true, subtree: true });
