@@ -23,6 +23,15 @@
     }, 80);
   }
 
+  function scrollToSignature() {
+    setTimeout(() => {
+      const signatureCanvas = document.getElementById('sig');
+      if (!signatureCanvas) return;
+      const heading = [...document.querySelectorAll('h3')].find((el) => el.textContent?.includes('산모 확인서명'));
+      (heading || signatureCanvas).scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 120);
+  }
+
   function restoreScrollPosition(top) {
     const restore = () => window.scrollTo({ top, left: 0, behavior: 'auto' });
     restore();
@@ -43,11 +52,15 @@
         saveButton.disabled = true;
         const keepScrollY = window.scrollY;
         try {
-          // 기록 저장 후에는 현재 보고 있던 위치를 그대로 유지한다.
+          // 기록 저장 후 같은 일차 화면을 갱신한다.
           await withoutListNavigation(() => originalSaveDay(day, adminMode, false));
           suppressNextDateScroll = true;
           await window.openDay(day, adminMode);
-          restoreScrollPosition(keepScrollY);
+
+          // 관리사 화면에서는 저장이 끝나면 바로 산모 서명란으로 부드럽게 이동한다.
+          // 운영자 화면에서는 기존처럼 보고 있던 위치를 유지한다.
+          if (adminMode) restoreScrollPosition(keepScrollY);
+          else scrollToSignature();
         } finally {
           const currentSave = document.getElementById('save');
           if (currentSave) currentSave.disabled = false;
