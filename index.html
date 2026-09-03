@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
   <title>베스트맘 제공기록</title>
-  <link rel="stylesheet" href="style.css?v=20260903-app41">
+  <link rel="stylesheet" href="style.css?v=20260903-app42">
 </head>
 <body>
   <div id="loginView" class="wrap login">
@@ -20,7 +20,7 @@
       <div class="muted tiny">개인 휴대폰에서만 사용해주세요. 비밀번호 자체는 별도로 저장하지 않습니다.</div>
       <button id="loginBtn" class="primary full mt">로그인</button>
       <div id="loginMsg" class="muted mt">연결 확인 중...</div>
-      <div class="muted mt tiny">앱 버전 APP-41 · PDF-8</div>
+      <div class="muted mt tiny">앱 버전 APP-42 · PDF-8</div>
     </div>
   </div>
 
@@ -45,13 +45,13 @@
 
   <script>
   (() => {
-    const VER = '20260903-app41';
+    const VER = '20260903-app42';
     const PDF_ENGINE = 'PDF-8.0';
     const PROJECT_REF = 'chbxwvsetyvzhxdfmzdj';
     let lastError = '';
 
-    const getMsg = () => document.getElementById('loginMsg');
-    const setMsg = (text) => { const el = getMsg(); if (el) el.textContent = text; };
+    const loginMsg = () => document.getElementById('loginMsg');
+    const setMsg = (text) => { const el = loginMsg(); if (el) el.textContent = text; };
     const setRuntime = (text) => { const el = document.getElementById('runtimeStatus'); if (el) el.textContent = text; };
 
     try {
@@ -63,197 +63,126 @@
     window.makePdf = () => window.alert('PDF 기능을 준비하고 있습니다. 잠시 후 다시 눌러주세요.');
 
     window.addEventListener('error', (e) => {
-      lastError = e && e.message ? e.message : '알 수 없는 오류';
-      if (!document.getElementById('loginView')?.classList.contains('hidden')) {
-        setMsg('화면 스크립트 오류: ' + lastError);
-      }
+      lastError = e?.message || '알 수 없는 오류';
+      if (!document.getElementById('loginView')?.classList.contains('hidden')) setMsg('화면 스크립트 오류: ' + lastError);
     });
-
     window.addEventListener('unhandledrejection', (e) => {
-      lastError = e && e.reason ? String(e.reason.message || e.reason) : '비동기 오류';
-      if (!document.getElementById('loginView')?.classList.contains('hidden')) {
-        setMsg('화면 처리 오류: ' + lastError);
-      }
+      lastError = e?.reason ? String(e.reason.message || e.reason) : '비동기 오류';
+      if (!document.getElementById('loginView')?.classList.contains('hidden')) setMsg('화면 처리 오류: ' + lastError);
     });
 
-    function loadScript(src, ok, fail, timeoutMs = 12000) {
-      const s = document.createElement('script');
-      let done = false;
-      const finish = (success) => {
-        if (done) return;
-        done = true;
-        clearTimeout(timer);
-        success ? (ok && ok()) : (fail && fail());
-      };
-      const timer = setTimeout(() => finish(false), timeoutMs);
-      s.src = src;
-      s.async = true;
-      s.onload = () => finish(true);
-      s.onerror = () => finish(false);
-      document.head.appendChild(s);
-    }
-
-    function loadPdfModule() {
-      setRuntime(`${PDF_ENGINE} 엔진 · 새 파일 불러오는 중`);
-      loadScript('pdf-v8.js', () => {
-        if (window.BESTMOM_PDF_ENGINE !== PDF_ENGINE) {
-          setRuntime(`PDF 엔진 버전 불일치 · ${window.BESTMOM_PDF_ENGINE || '확인불가'}`);
-          window.makePdf = () => window.alert('PDF 엔진 버전이 맞지 않습니다. 화면을 다시 열어주세요.');
-          return;
-        }
-        loadScript('pdf-save-v8.js', () => {
-          if (typeof window.makePdf === 'function' && typeof window.savePdf === 'function') {
-            setRuntime(`${PDF_ENGINE} 엔진 · 준비 완료`);
-          } else {
-            setRuntime(`${PDF_ENGINE} 엔진 · 시작 실패`);
-          }
-        }, () => {
-          setRuntime(`${PDF_ENGINE} 엔진 · 저장 모듈 실패`);
-        });
-      }, () => {
-        setRuntime(`${PDF_ENGINE} 엔진 · 파일 로딩 실패`);
-        window.makePdf = () => window.alert('PDF 새 엔진을 불러오지 못했습니다. 화면을 새로고침해주세요.');
+    function loadScript(src, timeoutMs = 12000) {
+      return new Promise((resolve) => {
+        const script = document.createElement('script');
+        let done = false;
+        const finish = (ok) => {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          resolve(ok);
+        };
+        const timer = setTimeout(() => finish(false), timeoutMs);
+        script.src = src;
+        script.async = true;
+        script.onload = () => finish(true);
+        script.onerror = () => finish(false);
+        document.head.appendChild(script);
       });
     }
 
-    function loadPdfTools() {
+    async function loadWithFallback(primary, fallback) {
+      if (await loadScript(primary)) return true;
+      return loadScript(fallback);
+    }
+
+    async function loadPdfTools() {
       setRuntime(`${PDF_ENGINE} 엔진 · 라이브러리 연결 중`);
-      loadScript('https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js', loadPdfModule, () => {
-        setRuntime(`${PDF_ENGINE} 엔진 · 라이브러리 재시도 중`);
-        loadScript('https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js', loadPdfModule, () => {
-          setRuntime(`${PDF_ENGINE} 엔진 · 라이브러리 연결 실패`);
-          window.makePdf = () => window.alert('PDF 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인해주세요.');
-        });
-      });
-    }
-
-    function finishAppStart() {
-      setTimeout(() => {
-        const btn = document.getElementById('loginBtn');
-        if (btn && typeof btn.onclick === 'function') {
-          setMsg('준비 완료 · 로그인해주세요.');
-          loadPdfTools();
-        } else {
-          setMsg('앱 시작 오류' + (lastError ? ': ' + lastError : ' · 로그인 기능을 연결하지 못했습니다.'));
-        }
-      }, 0);
-    }
-
-    function loadPdfUnpaidAlign() {
-      loadScript('pdf-unpaid-align-v38.js?v=' + VER, finishAppStart, finishAppStart);
-    }
-
-    function loadSignatureCopy() {
-      loadScript('signature-copy-v40.js?v=' + VER, loadPdfUnpaidAlign, loadPdfUnpaidAlign);
-    }
-
-    function loadServiceDays() {
-      loadScript('service-days-v39.js?v=' + VER, loadSignatureCopy, loadSignatureCopy);
-    }
-
-    function loadCaregiverRefresh() {
-      loadScript('caregiver-refresh-v29.js?v=' + VER, loadServiceDays, loadServiceDays);
-    }
-
-    function loadAdminUnpaid() {
-      loadScript('admin-unpaid-v35.js?v=' + VER, loadCaregiverRefresh, loadCaregiverRefresh);
-    }
-
-    function loadAdminEnded() {
-      loadScript('admin-ended-v32.js?v=' + VER, loadAdminUnpaid, loadAdminUnpaid);
-    }
-
-    function loadAdminRecordControls() {
-      loadScript('admin-record-controls-v33.js?v=' + VER, loadAdminEnded, loadAdminEnded);
-    }
-
-    function loadBabyInfo() {
-      loadScript('caregiver-baby-info-v23.js?v=' + VER, loadAdminRecordControls, loadAdminRecordControls);
-    }
-
-    function loadServiceComplete() {
-      loadScript('service-complete-v34.js?v=' + VER, loadBabyInfo, loadBabyInfo);
-    }
-
-    function loadRecordStatus() {
-      loadScript('record-status-v16.js?v=' + VER, loadServiceComplete, loadServiceComplete);
-    }
-
-    function loadNotesRequired() {
-      loadScript('notes-required-v18.js?v=' + VER, loadRecordStatus, loadRecordStatus);
-    }
-
-    function loadInputWarning() {
-      loadScript('input-warning-v14.js?v=' + VER, loadNotesRequired, loadNotesRequired);
-    }
-
-    function loadCaregiverSort() {
-      loadScript('caregiver-sort-v12.js?v=' + VER, loadInputWarning, loadInputWarning);
-    }
-
-    function loadAdminMenu() {
-      loadScript('admin-menu-v28.js?v=' + VER, loadCaregiverSort, loadCaregiverSort);
-    }
-
-    function loadAdminReopen() {
-      loadScript('admin-reopen-v26.js?v=' + VER, loadAdminMenu, loadAdminMenu);
-    }
-
-    function loadAdminDelete() {
-      loadScript('admin-delete-v11.js?v=' + VER, loadAdminReopen, loadAdminReopen);
-    }
-
-    function loadAdminSearch() {
-      loadScript('admin-search-v10.js?v=' + VER, loadAdminDelete, loadAdminDelete);
-    }
-
-    function loadNotesGuide() {
-      loadScript('ui-note-v9.js?v=' + VER, loadAdminSearch, loadAdminSearch);
-    }
-
-    function loadSaveFlow() {
-      loadScript('save-flow-v8.js?v=' + VER, loadNotesGuide, loadNotesGuide);
-    }
-
-    function loadUnlockPatch() {
-      loadScript('unlock-fix.js?v=' + VER, loadSaveFlow, loadSaveFlow);
-    }
-
-    function loadAdminSession() {
-      loadScript('admin-session-v25.js?v=' + VER, loadUnlockPatch, loadUnlockPatch);
-    }
-
-    function loadCaregiverPin() {
-      loadScript('caregiver-pin-v25.js?v=' + VER, loadAdminSession, loadAdminSession);
-    }
-
-    function loadAppPatches() {
-      loadScript('auto-login.js?v=' + VER, loadCaregiverPin, loadCaregiverPin);
-    }
-
-    function startApp() {
-      if (!window.supabase || typeof window.supabase.createClient !== 'function') {
-        setMsg('Supabase 연결 모듈을 불러오지 못했습니다.');
+      const libOk = await loadWithFallback(
+        'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js',
+        'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js'
+      );
+      if (!libOk) {
+        setRuntime(`${PDF_ENGINE} 엔진 · 라이브러리 연결 실패`);
+        window.makePdf = () => window.alert('PDF 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인해주세요.');
         return;
       }
-      setMsg('연결 모듈 준비됨 · 앱 시작 중...');
-      loadScript('app.js?v=' + VER, loadAppPatches, () => setMsg('앱 파일을 불러오지 못했습니다.'));
+
+      setRuntime(`${PDF_ENGINE} 엔진 · 새 파일 불러오는 중`);
+      if (!(await loadScript('pdf-v8.js?v=' + VER))) {
+        setRuntime(`${PDF_ENGINE} 엔진 · 파일 로딩 실패`);
+        window.makePdf = () => window.alert('PDF 엔진을 불러오지 못했습니다. 화면을 새로고침해주세요.');
+        return;
+      }
+      if (window.BESTMOM_PDF_ENGINE !== PDF_ENGINE) {
+        setRuntime(`PDF 엔진 버전 불일치 · ${window.BESTMOM_PDF_ENGINE || '확인불가'}`);
+        window.makePdf = () => window.alert('PDF 엔진 버전이 맞지 않습니다. 화면을 다시 열어주세요.');
+        return;
+      }
+      await loadScript('pdf-save-v8.js?v=' + VER);
+      setRuntime(
+        typeof window.makePdf === 'function' && typeof window.savePdf === 'function'
+          ? `${PDF_ENGINE} 엔진 · 준비 완료`
+          : `${PDF_ENGINE} 엔진 · 시작 실패`
+      );
     }
 
-    function tryUnpkg() {
-      setMsg('연결 모듈 다시 불러오는 중...');
-      loadScript('https://unpkg.com/@supabase/supabase-js@2.110.3/dist/umd/supabase.js', startApp, () => {
-        setMsg('Supabase 연결 모듈 로딩 실패');
-      });
-    }
-
-    function bootLoader() {
+    async function startApp() {
       setMsg('연결 확인 중...');
-      loadScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.3/dist/umd/supabase.js', startApp, tryUnpkg);
+      const supabaseOk = await loadWithFallback(
+        'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.3/dist/umd/supabase.js',
+        'https://unpkg.com/@supabase/supabase-js@2.110.3/dist/umd/supabase.js'
+      );
+      if (!supabaseOk || !window.supabase?.createClient) {
+        setMsg('Supabase 연결 모듈 로딩 실패');
+        return;
+      }
+
+      setMsg('연결 모듈 준비됨 · 앱 시작 중...');
+      if (!(await loadScript('app.js?v=' + VER))) {
+        setMsg('앱 파일을 불러오지 못했습니다.');
+        return;
+      }
+
+      const patches = [
+        'auto-login.js',
+        'caregiver-pin-v25.js',
+        'admin-session-v25.js',
+        'unlock-fix.js',
+        'save-flow-v8.js',
+        'ui-note-v9.js',
+        'admin-search-v10.js',
+        'admin-delete-v11.js',
+        'admin-reopen-v26.js',
+        'admin-menu-v28.js',
+        'caregiver-sort-v12.js',
+        'input-warning-v14.js',
+        'notes-required-v18.js',
+        'record-status-v16.js',
+        'service-complete-v34.js',
+        'caregiver-baby-info-v23.js',
+        'admin-record-controls-v33.js',
+        'admin-complete-v42.js',
+        'admin-ended-v32.js',
+        'admin-unpaid-v35.js',
+        'caregiver-refresh-v29.js',
+        'service-days-v39.js',
+        'signature-copy-v40.js',
+        'pdf-unpaid-align-v38.js'
+      ];
+
+      for (const file of patches) await loadScript(file + '?v=' + VER);
+
+      const btn = document.getElementById('loginBtn');
+      if (btn && typeof btn.onclick === 'function') {
+        setMsg('준비 완료 · 로그인해주세요.');
+        loadPdfTools();
+      } else {
+        setMsg('앱 시작 오류' + (lastError ? ': ' + lastError : ' · 로그인 기능을 연결하지 못했습니다.'));
+      }
     }
 
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootLoader);
-    else bootLoader();
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startApp);
+    else startApp();
   })();
   </script>
 </body>
