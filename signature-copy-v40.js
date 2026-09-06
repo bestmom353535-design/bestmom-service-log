@@ -112,7 +112,7 @@
         console.warn('signature copy audit error', auditError);
       }
 
-      alertMsg(`${previous.service_day}일차 서명을 불러왔습니다.\n확인 후 아래 ‘서명 완료 · 기록 잠금’을 눌러주세요.`);
+      alertMsg(`${previous.service_day}일차 서명을 불러왔습니다.\n확인 후 아래 ‘서명 저장하고 완료’를 눌러주세요.`);
     } catch (error) {
       console.error(error);
       alertMsg(`이전 서명을 불러오지 못했습니다. ${error?.message || ''}`);
