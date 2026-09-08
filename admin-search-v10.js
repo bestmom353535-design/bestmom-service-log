@@ -5,6 +5,12 @@
     return String(value || '').trim().toLowerCase();
   }
 
+  function getCaregiverName(row) {
+    const detail = String(row.querySelector('.muted')?.textContent || '');
+    const match = detail.match(/관리사\s+(.+?)(?:\s*·|$)/);
+    return normalize(match?.[1] || '');
+  }
+
   function attachSearch(card, type) {
     if (!card || card.dataset.searchReady === '1') return;
 
@@ -12,8 +18,8 @@
     if (!title) return;
 
     const isCaregiver = type === 'caregiver';
-    const placeholder = isCaregiver ? '관리사 이름 검색' : '산모 이름 검색';
-    const emptyText = isCaregiver ? '검색된 관리사가 없습니다.' : '검색된 산모가 없습니다.';
+    const placeholder = isCaregiver ? '관리사 이름 검색' : '산모명 또는 관리사명 검색';
+    const emptyText = isCaregiver ? '검색된 관리사가 없습니다.' : '검색된 서비스가 없습니다.';
 
     const wrap = document.createElement('div');
     wrap.className = 'mt';
@@ -38,13 +44,14 @@
       let shown = 0;
 
       rows.forEach((row) => {
-        const name = normalize(row.querySelector('b')?.textContent);
-        const visible = !query || name.includes(query);
+        const primaryName = normalize(row.querySelector('b')?.textContent);
+        const caregiverName = isCaregiver ? '' : getCaregiverName(row);
+        const visible = !query || primaryName.includes(query) || caregiverName.includes(query);
         row.style.display = visible ? '' : 'none';
         if (visible) shown += 1;
       });
 
-      count.textContent = query ? `${shown}명 검색됨` : '';
+      count.textContent = query ? `${shown}${isCaregiver ? '명' : '건'} 검색됨` : '';
       empty.style.display = query && shown === 0 ? '' : 'none';
     };
 
