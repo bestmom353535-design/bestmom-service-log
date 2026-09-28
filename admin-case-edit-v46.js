@@ -1,6 +1,6 @@
 (() => {
-  if (window.__BESTMOM_ADMIN_CASE_EDIT_V46__) return;
-  window.__BESTMOM_ADMIN_CASE_EDIT_V46__ = true;
+  if (window.__BESTMOM_ADMIN_CASE_EDIT_V49__) return;
+  window.__BESTMOM_ADMIN_CASE_EDIT_V49__ = true;
 
   const CHOSEONG = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
   const consonantRe = /^[ㄱ-ㅎ]$/;
@@ -80,7 +80,7 @@
         <div style="width:min(94vw,720px);background:#fff;border-radius:16px;padding:18px;margin:20px 0;box-shadow:0 18px 45px rgba(0,0,0,.22)">
           <div class="row space" style="align-items:flex-start">
             <div>
-              <h3 style="margin-bottom:4px">산모 · 배정정보 수정</h3>
+              <h3 style="margin-bottom:4px">서비스 정보 수정</h3>
               <div class="muted">기존 제공기록과 산모 서명은 그대로 유지됩니다.</div>
             </div>
             <button type="button" id="adminCaseEditClose" class="secondary" style="width:auto;min-width:70px">닫기</button>
@@ -97,6 +97,13 @@
             <div><label>신생아명</label><input id="editBabyName" value="${esc(serviceCase.baby_name || '')}"></div>
             <div><label>신생아 출생일</label><input id="editBabyBirth" type="date" value="${esc(serviceCase.baby_birth_date || '')}"></div>
             <div><label>출생체중(kg)</label><input id="editBirthWeight" type="number" step="0.01" inputmode="decimal" value="${esc(serviceCase.birth_weight ?? '')}"></div>
+            <div><label>서비스 기간</label><select id="editServiceDays">
+              <option value="5" ${Number(serviceCase.service_days) === 5 ? 'selected' : ''}>1주 (5일)</option>
+              <option value="10" ${Number(serviceCase.service_days) === 10 ? 'selected' : ''}>2주 (10일)</option>
+              <option value="15" ${Number(serviceCase.service_days) === 15 ? 'selected' : ''}>3주 (15일)</option>
+              <option value="20" ${Number(serviceCase.service_days) === 20 ? 'selected' : ''}>4주 (20일)</option>
+            </select></div>
+            <div><label>서비스 시작일</label><input id="editStartDate" type="date" value="${esc(serviceCase.start_date || '')}"></div>
           </div>
 
           <div class="mt" style="position:relative">
@@ -109,7 +116,7 @@
           </div>
 
           <div class="notice mt" style="background:#f8fafc;border-color:#e5e7eb">
-            관리사를 변경하면 저장 즉시 새 관리사에게 해당 서비스가 표시되고, 기존 관리사 화면에서는 빠집니다.
+            등록한 산모·아기 정보, 서비스 기간·시작일, 배정 관리사를 수정할 수 있습니다. 관리사를 변경하면 저장 즉시 새 관리사에게 해당 서비스가 표시되고 기존 관리사 화면에서는 빠집니다.
           </div>
 
           <div class="row" style="justify-content:flex-end;margin-top:16px">
@@ -189,8 +196,30 @@
           baby_name: document.getElementById('editBabyName').value.trim() || null,
           baby_birth_date: document.getElementById('editBabyBirth').value || null,
           birth_weight: document.getElementById('editBirthWeight').value || null,
+          service_days: Number(document.getElementById('editServiceDays').value),
+          start_date: document.getElementById('editStartDate').value || null,
           caregiver_id: hiddenId.value || null
         };
+
+        if (![5, 10, 15, 20].includes(payload.service_days)) {
+          return alertMsg('서비스 기간을 다시 선택해주세요.');
+        }
+
+        if (payload.service_days < Number(serviceCase.service_days || 0)) {
+          const { data: laterRecords, error: laterError } = await sb
+            .from('daily_records')
+            .select('service_day')
+            .eq('case_id', caseId)
+            .gt('service_day', payload.service_days)
+            .order('service_day');
+          if (laterError) return alertMsg('기존 기록을 확인하지 못했습니다.');
+          if ((laterRecords || []).length) {
+            const firstDay = Number(laterRecords[0].service_day);
+            return alertMsg(
+              `${firstDay}일차 이후에 이미 작성된 기록이 있어 서비스 기간을 ${payload.service_days}일로 줄일 수 없습니다.\n\n기존 기록 보호를 위해 자동 삭제하지 않습니다.`
+            );
+          }
+        }
 
         const oldCaregiverId = serviceCase.caregiver_id || null;
         const newCaregiverId = payload.caregiver_id || null;
@@ -198,9 +227,18 @@
         const newCaregiver = caregiverList.find((x) => x.id === newCaregiverId);
         const oldCaregiver = caregiverList.find((x) => x.id === oldCaregiverId);
 
-        const message = caregiverChanged
-          ? `산모 정보와 배정 관리사를 수정하시겠습니까?\n\n관리사: ${oldCaregiver?.full_name || '미지정'} → ${newCaregiver?.full_name || '미지정'}\n\n기존 제공기록과 산모 서명은 그대로 유지됩니다.`
-          : '산모 정보를 수정하시겠습니까?\n\n기존 제공기록과 산모 서명은 그대로 유지됩니다.';
+        const serviceDaysChanged = Number(serviceCase.service_days) !== payload.service_days;
+        const startDateChanged = (serviceCase.start_date || null) !== payload.start_date;
+        const changeLines = [];
+        if (caregiverChanged) changeLines.push(`관리사: ${oldCaregiver?.full_name || '미지정'} → ${newCaregiver?.full_name || '미지정'}`);
+        if (serviceDaysChanged) changeLines.push(`서비스 기간: ${serviceCase.service_days}일 → ${payload.service_days}일`);
+        if (startDateChanged) changeLines.push(`시작일: ${serviceCase.start_date || '미입력'} → ${payload.start_date || '미입력'}`);
+
+        const message =
+          '서비스 정보를 수정하시겠습니까?' +
+          (changeLines.length ? '\n\n' + changeLines.join('\n') : '') +
+          '\n\n기존 제공기록과 산모 서명은 그대로 유지됩니다.';
+
         if (!window.confirm(message)) return;
 
         saveButton.disabled = true;
@@ -218,6 +256,10 @@
                 details: {
                   mother_name_before: serviceCase.mother_name || null,
                   mother_name_after: payload.mother_name,
+                  service_days_before: Number(serviceCase.service_days || 0),
+                  service_days_after: payload.service_days,
+                  start_date_before: serviceCase.start_date || null,
+                  start_date_after: payload.start_date,
                   caregiver_id_before: oldCaregiverId,
                   caregiver_id_after: newCaregiverId,
                   caregiver_name_before: oldCaregiver?.full_name || null,
@@ -230,7 +272,7 @@
           }
 
           removeModal();
-          alertMsg('산모 및 배정정보를 수정했습니다. 기존 기록과 서명은 그대로 유지됩니다.');
+          alertMsg('서비스 정보를 수정했습니다. 기존 기록과 서명은 그대로 유지됩니다.');
           if (typeof adminCases === 'function') await adminCases();
           else location.reload();
         } catch (error) {
@@ -286,7 +328,7 @@
         button.type = 'button';
         button.className = 'secondary';
         button.dataset.adminEditCase = caseId;
-        button.textContent = '산모 · 관리사 수정';
+        button.textContent = '서비스 정보 수정';
         button.onclick = () => openEditor(caseId);
 
         const buttonRow = openButton.closest('.row') || row;
