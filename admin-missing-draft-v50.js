@@ -1,6 +1,6 @@
 (() => {
-  if (window.__BESTMOM_ADMIN_MISSING_DRAFT_V61__) return;
-  window.__BESTMOM_ADMIN_MISSING_DRAFT_V61__ = true;
+  if (window.__BESTMOM_ADMIN_MISSING_DRAFT_V66__) return;
+  window.__BESTMOM_ADMIN_MISSING_DRAFT_V66__ = true;
 
   const previousOpenDay = window.openDay;
   const previousOpenCase = window.openCase;
@@ -434,18 +434,31 @@
     const button = document.createElement('button');
     button.id = 'adminMissingDraft';
     button.type = 'button';
-    button.className = 'secondary full mt';
-    button.textContent = `${day}일차 빈칸 자동 채우기`;
-    button.style.fontWeight = '800';
+    button.className = 'secondary';
+    button.textContent = `${day}일차 빈칸 채우기`;
+    button.style.cssText = 'font-weight:800;width:auto;min-width:150px;flex:0 0 auto;';
     button.onclick = () => fillMissingDraft(day, button);
 
     const help = document.createElement('div');
     help.className = 'muted tiny';
-    help.style.marginTop = '6px';
-    help.textContent = `현재 선택한 ${day}일차의 비어 있는 항목만 채웁니다. 앞선 기록이 있으면 참고하고, 없으면 3주차 일반 초안값을 사용합니다. 기존 입력값·서비스 날짜·서명·기타서비스는 건드리지 않습니다.`;
+    help.style.marginTop = '5px';
+    help.textContent = '비어 있는 항목만 채우며 기존 입력값·서비스 날짜·서명·기타서비스는 건드리지 않습니다.';
 
-    save.insertAdjacentElement('beforebegin', button);
-    button.insertAdjacentElement('afterend', help);
+    const dateInput = document.getElementById('serviceDate');
+    if (dateInput) {
+      const dateRow = document.createElement('div');
+      dateRow.dataset.adminDraftTop = '1';
+      dateRow.className = 'row';
+      dateRow.style.cssText = 'align-items:flex-end;gap:8px;flex-wrap:wrap;';
+      dateInput.insertAdjacentElement('beforebegin', dateRow);
+      dateRow.appendChild(dateInput);
+      dateInput.style.flex = '1 1 190px';
+      dateRow.appendChild(button);
+      dateRow.insertAdjacentElement('afterend', help);
+    } else {
+      save.insertAdjacentElement('beforebegin', button);
+      button.insertAdjacentElement('afterend', help);
+    }
 
     const originalSave = save.onclick;
     if (typeof originalSave === 'function') {
