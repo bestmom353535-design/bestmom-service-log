@@ -1,6 +1,6 @@
 (() => {
-  if (window.__BESTMOM_ADMIN_MISSING_DRAFT_V57__) return;
-  window.__BESTMOM_ADMIN_MISSING_DRAFT_V57__ = true;
+  if (window.__BESTMOM_ADMIN_MISSING_DRAFT_V60__) return;
+  window.__BESTMOM_ADMIN_MISSING_DRAFT_V60__ = true;
 
   const previousOpenDay = window.openDay;
   const previousOpenCase = window.openCase;
@@ -94,17 +94,34 @@
     return mode(normalized, fallback);
   }
 
-  function shortRepeatedNote(records) {
-    const notes = records.map((r) => String(r.notes || '').trim()).filter(Boolean);
-    if (!notes.length) return null;
-    const picked = mode(notes, null);
-    if (!picked || picked.length > 36) return null;
-    const count = notes.filter((x) => x === picked).length;
-    if (records.length >= 2 && count < 2) return null;
-    return picked;
+  const NOTE_VARIATIONS = [
+    '수유 후 편안히 수면함.',
+    '수유·트림 후 안정적으로 휴식함.',
+    '수유 및 수면상태 전반적으로 양호함.',
+    '기저귀 교환 후 편안히 지냄.',
+    '수유 후 트림 잘하며 휴식함.',
+    '수유·배변상태 특이사항 없음.',
+    '수면상태 양호하며 수유 진행함.',
+    '아기 상태 안정적으로 관찰됨.',
+    '수유 후 편안한 모습 보임.',
+    '수유 및 기저귀 관리 후 휴식함.'
+  ];
+
+  function variedNote(day, records = []) {
+    const uniquePrior = [...new Set(
+      (records || [])
+        .map((r) => String(r.notes || '').trim())
+        .filter((x) => x && x.length <= 36)
+    )];
+
+    if (uniquePrior.length >= 2) {
+      return uniquePrior[(Math.max(1, Number(day)) - 1) % uniquePrior.length];
+    }
+
+    return NOTE_VARIATIONS[(Math.max(1, Number(day)) - 1) % NOTE_VARIATIONS.length];
   }
 
-  function buildFromPrevious(records) {
+  function buildFromPrevious(records, day) {
     const recent = records.slice(0, 5);
     const latest = recent[0] || {};
     const formulaCount = median(recent.map((r) => r.formula_count));
@@ -122,12 +139,12 @@
       formula_ml: formulaCount === 0 ? null : median(recent.map((r) => r.formula_ml)),
       stool_status: mode(recent.map((r) => r.stool_status), '정상변'),
       bath_cord_status: mode(recent.map((r) => r.bath_cord_status), '실시'),
-      notes: shortRepeatedNote(recent) || '수유 및 수면상태 양호함.'
+      notes: variedNote(day, recent)
     };
     return result;
   }
 
-  function buildGenericThreeWeekDraft() {
+  function buildGenericThreeWeekDraft(day) {
     return {
       incision_status: ['이상없음'],
       breast_status: ['이상없음'],
@@ -142,7 +159,7 @@
       formula_ml: 70,
       stool_status: '정상변',
       bath_cord_status: '실시',
-      notes: '수유 및 수면상태 양호함.'
+      notes: variedNote(day)
     };
   }
 
@@ -254,7 +271,7 @@
 
         const hasPrevious = previous.length > 0;
         drafts[day] = {
-          draft: hasPrevious ? buildFromPrevious(previous) : buildGenericThreeWeekDraft(),
+          draft: hasPrevious ? buildFromPrevious(previous, day) : buildGenericThreeWeekDraft(day),
           basis: hasPrevious ? 'previous_records' : 'generic_three_week_draft',
           reference_service_days: hasPrevious ? previous.map((item) => Number(item.service_day)) : [],
           prepared_at: new Date().toISOString()
@@ -352,7 +369,7 @@
       if (error) throw error;
 
       const hasPrevious = (previous || []).length > 0;
-      const draft = hasPrevious ? buildFromPrevious(previous) : buildGenericThreeWeekDraft();
+      const draft = hasPrevious ? buildFromPrevious(previous, day) : buildGenericThreeWeekDraft(day);
       applyDraft(draft);
 
       const date = document.getElementById('serviceDate');
