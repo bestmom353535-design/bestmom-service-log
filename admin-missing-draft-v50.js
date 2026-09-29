@@ -104,20 +104,20 @@
     '수면상태 양호하며 수유 진행함.',
     '아기 상태 안정적으로 관찰됨.',
     '수유 후 편안한 모습 보임.',
-    '수유 및 기저귀 관리 후 휴식함.'
+    '수유 및 기저귀 관리 후 휴식함.',
+    '수유 후 수면 이어감.',
+    '수유·트림 후 편안히 지냄.',
+    '수유 및 배변상태 양호함.',
+    '수면과 수유 상태 양호함.',
+    '기저귀 교환 및 수유 후 휴식함.',
+    '수유 후 안정적으로 수면함.',
+    '수유·배변 및 수면상태 관찰함.',
+    '전반적인 아기 상태 양호함.',
+    '수유 후 트림하고 편안히 휴식함.',
+    '수유 및 일상 돌봄 후 안정적임.'
   ];
 
-  function variedNote(day, records = []) {
-    const uniquePrior = [...new Set(
-      (records || [])
-        .map((r) => String(r.notes || '').trim())
-        .filter((x) => x && x.length <= 36)
-    )];
-
-    if (uniquePrior.length >= 2) {
-      return uniquePrior[(Math.max(1, Number(day)) - 1) % uniquePrior.length];
-    }
-
+  function variedNote(day) {
     return NOTE_VARIATIONS[(Math.max(1, Number(day)) - 1) % NOTE_VARIATIONS.length];
   }
 
@@ -139,7 +139,7 @@
       formula_ml: formulaCount === 0 ? null : median(recent.map((r) => r.formula_ml)),
       stool_status: mode(recent.map((r) => r.stool_status), '정상변'),
       bath_cord_status: mode(recent.map((r) => r.bath_cord_status), '실시'),
-      notes: variedNote(day, recent)
+      notes: variedNote(day)
     };
     return result;
   }
