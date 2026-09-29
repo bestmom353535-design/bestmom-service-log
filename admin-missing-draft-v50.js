@@ -1,6 +1,6 @@
 (() => {
-  if (window.__BESTMOM_ADMIN_MISSING_DRAFT_V52__) return;
-  window.__BESTMOM_ADMIN_MISSING_DRAFT_V52__ = true;
+  if (window.__BESTMOM_ADMIN_MISSING_DRAFT_V55__) return;
+  window.__BESTMOM_ADMIN_MISSING_DRAFT_V55__ = true;
 
   const previousOpenDay = window.openDay;
   if (typeof previousOpenDay !== 'function') return;
@@ -198,22 +198,21 @@
     const save = document.getElementById('save');
     if (!save || document.getElementById('adminMissingDraft')) return;
 
-    // 이미 생성된 기록이 있는 일차에는 자동 초안 버튼을 표시하지 않음.
-    // 운영자가 선택한 '미작성 일차' 하나에만 적용되도록 제한함.
-    if (typeof currentRecord !== 'undefined' && currentRecord?.id) return;
+    // 운영자가 현재 열어둔 일차 하나에만 적용함.
+    // 기존 값은 그대로 두고 비어 있는 항목만 채움.
 
     const button = document.createElement('button');
     button.id = 'adminMissingDraft';
     button.type = 'button';
     button.className = 'secondary full mt';
-    button.textContent = `${day}일차 누락 기록 초안 채우기`;
+    button.textContent = `${day}일차 빈칸 자동 채우기`;
     button.style.fontWeight = '800';
     button.onclick = () => fillMissingDraft(day, button);
 
     const help = document.createElement('div');
     help.className = 'muted tiny';
     help.style.marginTop = '6px';
-    help.textContent = `현재 선택한 ${day}일차에만 적용됩니다. 앞선 기록이 있으면 참고하고, 없으면 3주차 일반 초안값을 넣습니다. 날짜와 서명은 자동입력하지 않습니다.`;
+    help.textContent = `현재 선택한 ${day}일차의 비어 있는 항목만 채웁니다. 앞선 기록이 있으면 참고하고, 없으면 3주차 일반 초안값을 사용합니다. 기존 입력값·서비스 날짜·서명은 건드리지 않습니다.`;
 
     save.insertAdjacentElement('beforebegin', button);
     button.insertAdjacentElement('afterend', help);
