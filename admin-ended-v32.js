@@ -161,6 +161,25 @@
       return bt - at;
     });
 
+    const recordCounts = {};
+    if (ended.length) {
+      const endedIds = ended.map((item) => item.id);
+      const { data: records, error: recordsError } = await sb
+        .from('daily_records')
+        .select('case_id,service_day')
+        .in('case_id', endedIds);
+
+      if (!recordsError) {
+        const seen = new Map();
+        (records || []).forEach((row) => {
+          if (!seen.has(row.case_id)) seen.set(row.case_id, new Set());
+          seen.get(row.case_id).add(Number(row.service_day));
+        });
+        seen.forEach((days, caseId) => { recordCounts[caseId] = days.size; });
+      } else {
+        console.error('종료 서비스 기록 수 확인 오류', recordsError);
+      }
+    }
     if (!ended.length) {
       main().innerHTML = `
         <div class="card">
@@ -183,7 +202,10 @@
           <h3 style="margin-bottom:0">${escapeHtml(monthLabel(key))}</h3>
           <span class="pill">${items.length}건</span>
         </div>
-        ${items.map((c) => `
+        ${items.map((c) => {
+          const written = recordCounts[c.id] || 0;
+          const recordComplete = written >= Number(c.service_days || 0);
+          return `
           <div class="case" data-ended-case="${c.id}">
             <div class="row space">
               <div>
@@ -191,8 +213,13 @@
                 <div class="muted">아기 ${escapeHtml(c.baby_name || '')} · 관리사 ${escapeHtml(c.caregiver?.full_name || '미지정')} · ${c.service_days}일</div>
                 <div class="muted tiny" style="margin-top:4px">종료 처리일 ${escapeHtml(dateLabel(c.completed_at))}</div>
               </div>
-              <div style="font-size:13px;font-weight:800;color:${c.status === 'completed' ? '#166534' : '#92400e'};white-space:nowrap">
-                ${c.status === 'completed' ? '서비스 완료 ✓' : '중도 종료 ✓'}
+              <div style="text-align:right;white-space:nowrap">
+                <div style="font-size:13px;font-weight:800;color:${c.status === 'completed' ? '#166534' : '#92400e'}">
+                  ${c.status === 'completed' ? '서비스 완료 ✓' : '중도 종료 ✓'}
+                </div>
+                <div style="margin-top:6px;display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:900;background:${recordComplete ? '#dcfce7' : '#fee2e2'};color:${recordComplete ? '#166534' : '#991b1b'};border:1px solid ${recordComplete ? '#86efac' : '#fca5a5'}">
+                  ${recordComplete ? '기록완료' : '미완성'} · ${written}/${c.service_days}일
+                </div>
               </div>
             </div>
             <div class="row mt">
@@ -201,7 +228,8 @@
               ${c.status === 'stopped' ? `<button class="ok" type="button" data-ended-reopen="${c.id}">중도 종료 해제</button>` : ''}
               <button class="danger" type="button" data-ended-delete="${c.id}">삭제</button>
             </div>
-          </div>`).join('')}
+          </div>`;
+        }).join('')}
       </div>`).join('');
 
     main().innerHTML = `
