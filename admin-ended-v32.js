@@ -138,6 +138,27 @@
     }
   }
 
+  async function finalizeEnded(caseId, motherName, button) {
+    const ok = window.confirm(
+      `${motherName || '해당 산모'} 기록을 최종완성 처리하시겠습니까?\n\n` +
+      '최종완성 목록으로 이동하며 종료 서비스 목록에서는 보이지 않습니다.\n' +
+      '추후 최종완성 목록의 수정 버튼으로 다시 내용을 확인하고 수정할 수 있습니다.'
+    );
+    if (!ok) return;
+
+    if (button) button.disabled = true;
+    try {
+      const { error } = await sb.rpc('admin_finalize_service_case', { p_case_id: caseId });
+      if (error) throw error;
+      alertMsg('최종완성 처리했습니다.');
+      await renderEndedServices();
+    } catch (err) {
+      console.error(err);
+      alertMsg(`최종완성 처리하지 못했습니다. ${err?.message || ''}`);
+      if (button) button.disabled = false;
+    }
+  }
+
   async function reopenStopped(caseId, motherName, button) {
     const ok = window.confirm(
       `${motherName || '해당 산모'}의 중도 종료를 해제하시겠습니까?\n\n진행 중 서비스로 다시 변경되며 기존 기록과 서명은 그대로 유지됩니다.`
@@ -189,7 +210,8 @@
     const { data, error } = await sb
       .from('service_cases')
       .select('*,caregiver:profiles!service_cases_caregiver_id_fkey(full_name)')
-      .in('status', ['completed', 'stopped']);
+      .in('status', ['completed', 'stopped'])
+      .is('final_completed_at', null);
 
     if (error) {
       console.error(error);
@@ -281,9 +303,11 @@
             <div class="row mt">
               <button class="secondary" type="button" data-ended-open="${c.id}">기록 보기</button>
               <button class="secondary" type="button" onclick="makePdf('${c.id}')">제공기록지 PDF 보기</button>
+              <button class="secondary" type="button" data-ended-edit="${c.id}">관리사 수정</button>
               ${c.status === 'stopped' ? `<button class="ok" type="button" data-ended-reopen="${c.id}">중도 종료 해제</button>` : ''}
               <button class="${c.branch === 'bundang' ? 'primary' : 'secondary'}" type="button" data-ended-branch="bundang" data-case-id="${c.id}" style="width:auto;min-width:58px;padding-left:12px;padding-right:12px">분당</button>
               <button class="${c.branch === 'yongin' ? 'primary' : 'secondary'}" type="button" data-ended-branch="yongin" data-case-id="${c.id}" style="width:auto;min-width:58px;padding-left:12px;padding-right:12px">용인</button>
+              <button class="ok" type="button" data-ended-final="${c.id}">최종완성</button>
               <button class="danger" type="button" data-ended-delete="${c.id}">삭제</button>
             </div>
           </div>`;
@@ -318,9 +342,16 @@
       const row = document.querySelector(`[data-ended-case="${c.id}"]`);
       const openButton = row?.querySelector(`[data-ended-open="${c.id}"]`);
       const reopenButton = row?.querySelector(`[data-ended-reopen="${c.id}"]`);
+      const editButton = row?.querySelector(`[data-ended-edit="${c.id}"]`);
+      const finalButton = row?.querySelector(`[data-ended-final="${c.id}"]`);
       const deleteButton = row?.querySelector(`[data-ended-delete="${c.id}"]`);
       const branchButtons = [...(row?.querySelectorAll('[data-ended-branch]') || [])];
       if (openButton) openButton.onclick = () => window.openEndedRecord(c.id);
+      if (editButton) editButton.onclick = () => {
+        if (typeof window.openAdminCaseEditor === 'function') window.openAdminCaseEditor(c.id);
+        else alertMsg('수정 기능을 불러오지 못했습니다. 화면을 새로고침해주세요.');
+      };
+      if (finalButton) finalButton.onclick = () => finalizeEnded(c.id, c.mother_name, finalButton);
       if (reopenButton) reopenButton.onclick = () => reopenStopped(c.id, c.mother_name, reopenButton);
       branchButtons.forEach((branchButton) => {
         branchButton.onclick = () => moveEndedToBranch(
