@@ -347,6 +347,7 @@
             </div>
             <div class="row mt">
               <button class="secondary" type="button" data-ended-open="${c.id}">기록 보기</button>
+              <button class="secondary" type="button" data-ended-signatures="${c.id}">서명 확인</button>
               <button class="secondary" type="button" onclick="makePdf('${c.id}')">제공기록지 PDF 보기</button>
               <button class="secondary" type="button" data-ended-edit="${c.id}">관리사 수정</button>
               ${c.status === 'stopped' ? `<button class="ok" type="button" data-ended-reopen="${c.id}">중도 종료 해제</button>` : ''}
@@ -407,10 +408,18 @@
       const openButton = row?.querySelector(`[data-ended-open="${c.id}"]`);
       const reopenButton = row?.querySelector(`[data-ended-reopen="${c.id}"]`);
       const editButton = row?.querySelector(`[data-ended-edit="${c.id}"]`);
+      const signatureButton = row?.querySelector(`[data-ended-signatures="${c.id}"]`);
       const finalButton = row?.querySelector(`[data-ended-final="${c.id}"]`);
       const deleteButton = row?.querySelector(`[data-ended-delete="${c.id}"]`);
       const branchButtons = [...(row?.querySelectorAll('[data-ended-branch]') || [])];
       if (openButton) openButton.onclick = () => window.openEndedRecord(c.id);
+      if (signatureButton) signatureButton.onclick = () => {
+        if (typeof window.openEndedSignatureReview === 'function') {
+          window.openEndedSignatureReview(c.id, c.mother_name);
+        } else {
+          alertMsg('서명 확인 기능을 불러오지 못했습니다. 화면을 새로고침해주세요.');
+        }
+      };
       if (editButton) editButton.onclick = () => {
         if (typeof window.openAdminCaseEditor === 'function') window.openAdminCaseEditor(c.id);
         else alertMsg('수정 기능을 불러오지 못했습니다. 화면을 새로고침해주세요.');
