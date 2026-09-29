@@ -7,6 +7,7 @@
 
   let finalBranchFilter = 'all';
   let finalMonthFilter = 'all';
+  let finalReturnState = null;
 
   function setActiveTab(tabName) {
     document.querySelectorAll('#adminNav [data-tab]').forEach((button) => {
@@ -50,11 +51,21 @@
     }).format(date).replace(/\.\s*/g, '.').replace(/\.$/, '');
   }
 
+  window.requestFinalListRestore = function requestFinalListRestore(caseId, scrollY = window.scrollY) {
+    finalReturnState = { caseId, scrollY: Number(scrollY) || 0 };
+  };
+
   window.openFinalCompletedRecord = async function openFinalCompletedRecord(caseId) {
+    const returnState = { caseId, scrollY: window.scrollY };
     await window.openCase(caseId, true);
 
     const back = document.getElementById('back');
-    if (back) back.onclick = () => renderFinalCompletedServices();
+    if (back) {
+      back.onclick = async () => {
+        finalReturnState = returnState;
+        await renderFinalCompletedServices();
+      };
+    }
 
     const topCard = document.querySelector('#main > .card');
     const topRow = topCard?.querySelector('.row.space');
@@ -212,6 +223,19 @@
       const button = document.querySelector(`[data-final-edit="${c.id}"]`);
       if (button) button.onclick = () => window.openFinalCompletedRecord(c.id);
     });
+
+    if (finalReturnState) {
+      const state = finalReturnState;
+      finalReturnState = null;
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const row = document.querySelector(`[data-final-case="${state.caseId}"]`);
+        if (row) {
+          row.scrollIntoView({ block: 'center', behavior: 'auto' });
+        } else {
+          window.scrollTo({ top: state.scrollY || 0, behavior: 'auto' });
+        }
+      }));
+    }
   }
 
   window.renderFinalCompletedServices = renderFinalCompletedServices;
