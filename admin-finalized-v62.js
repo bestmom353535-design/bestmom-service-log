@@ -6,6 +6,7 @@
   if (typeof previousShowAdminTab !== 'function') return;
 
   let finalBranchFilter = 'all';
+  let finalMonthFilter = 'all';
 
   function setActiveTab(tabName) {
     document.querySelectorAll('#adminNav [data-tab]').forEach((button) => {
@@ -122,14 +123,24 @@
       return true;
     });
 
+    const availableMonths = [...new Set(visible.map((item) => startMonthKey(item.start_date)))];
+    if (finalMonthFilter !== 'all' && !availableMonths.includes(finalMonthFilter)) {
+      finalMonthFilter = 'all';
+    }
+
+    const monthVisibleFinal = visible.filter((item) => {
+      if (finalMonthFilter === 'all') return true;
+      return startMonthKey(item.start_date) === finalMonthFilter;
+    });
+
     const groups = new Map();
-    visible.forEach((item) => {
+    monthVisibleFinal.forEach((item) => {
       const key = startMonthKey(item.start_date);
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(item);
     });
 
-    const body = visible.length
+    const body = monthVisibleFinal.length
       ? [...groups.entries()].map(([key, items]) => `
         <div class="card" data-final-month="${escapeHtml(key)}">
           <div class="row space">
@@ -167,17 +178,36 @@
           <button type="button" class="${finalBranchFilter === 'yongin' ? 'primary' : 'secondary'}" data-final-folder="yongin">용인 ${counts.yongin}</button>
           <button type="button" class="${finalBranchFilter === 'unassigned' ? 'primary' : 'secondary'}" data-final-folder="unassigned">미분류 ${counts.unassigned}</button>
         </div>
+        <div class="mt" style="max-width:280px">
+          <label for="finalMonthSelect">시작월 선택</label>
+          <select id="finalMonthSelect">
+            <option value="all" ${finalMonthFilter === 'all' ? 'selected' : ''}>전체 월 (${visible.length}건)</option>
+            ${availableMonths.map((key) => {
+              const count = visible.filter((item) => startMonthKey(item.start_date) === key).length;
+              return `<option value="${escapeHtml(key)}" ${finalMonthFilter === key ? 'selected' : ''}>${escapeHtml(monthLabel(key))} (${count}건)</option>`;
+            }).join('')}
+          </select>
+        </div>
       </div>
       ${body}`;
 
     document.querySelectorAll('[data-final-folder]').forEach((button) => {
       button.onclick = async () => {
         finalBranchFilter = button.dataset.finalFolder || 'all';
+        finalMonthFilter = 'all';
         await renderFinalCompletedServices();
       };
     });
 
-    visible.forEach((c) => {
+    const finalMonthSelect = document.getElementById('finalMonthSelect');
+    if (finalMonthSelect) {
+      finalMonthSelect.onchange = async () => {
+        finalMonthFilter = finalMonthSelect.value || 'all';
+        await renderFinalCompletedServices();
+      };
+    }
+
+    monthVisibleFinal.forEach((c) => {
       const button = document.querySelector(`[data-final-edit="${c.id}"]`);
       if (button) button.onclick = () => window.openFinalCompletedRecord(c.id);
     });
