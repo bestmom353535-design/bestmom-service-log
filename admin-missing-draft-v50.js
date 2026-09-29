@@ -1,12 +1,63 @@
 (() => {
-  if (window.__BESTMOM_ADMIN_MISSING_DRAFT_V55__) return;
-  window.__BESTMOM_ADMIN_MISSING_DRAFT_V55__ = true;
+  if (window.__BESTMOM_ADMIN_MISSING_DRAFT_V56__) return;
+  window.__BESTMOM_ADMIN_MISSING_DRAFT_V56__ = true;
 
   const previousOpenDay = window.openDay;
-  if (typeof previousOpenDay !== 'function') return;
+  const previousOpenCase = window.openCase;
+  if (typeof previousOpenDay !== 'function' || typeof previousOpenCase !== 'function') return;
+
+  const BULK_STORAGE_PREFIX = 'bestmom_bulk_record_drafts_v56_';
 
   function isAdmin() {
     return typeof me !== 'undefined' && me?.role === 'admin';
+  }
+
+  function bulkKey(caseId) {
+    return BULK_STORAGE_PREFIX + caseId;
+  }
+
+  function loadBulkDrafts(caseId) {
+    try {
+      return JSON.parse(localStorage.getItem(bulkKey(caseId)) || '{}') || {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function saveBulkDrafts(caseId, drafts) {
+    try {
+      localStorage.setItem(bulkKey(caseId), JSON.stringify(drafts || {}));
+      return true;
+    } catch (error) {
+      console.error('전체 초안 저장 오류', error);
+      return false;
+    }
+  }
+
+  function recordNeedsDraft(row) {
+    if (!row) return true;
+    if (row.locked) return false;
+
+    const missingArray = (value) => !Array.isArray(value) || value.length === 0;
+    const missingText = (value) => !String(value || '').trim();
+    const missingNumber = (value) => value === null || value === undefined || value === '';
+
+    if (missingArray(row.incision_status)) return true;
+    if (missingArray(row.breast_status)) return true;
+    if (missingArray(row.urination_bowel_status)) return true;
+    if (missingText(row.sitz_bath)) return true;
+    if (missingNumber(row.meal_count)) return true;
+    if (missingNumber(row.snack_count)) return true;
+    if (missingNumber(row.baby_temp)) return true;
+    if (missingText(row.sleep_status)) return true;
+    if (missingNumber(row.breastfeed_count)) return true;
+    if (missingNumber(row.formula_count)) return true;
+    if (Number(row.formula_count) !== 0 && missingNumber(row.formula_ml)) return true;
+    if (missingText(row.stool_status)) return true;
+    if (missingText(row.bath_cord_status)) return true;
+    if (missingText(row.other_service)) return true;
+    if (missingText(row.notes)) return true;
+    return false;
   }
 
   function values(arr) {
@@ -145,6 +196,153 @@
     if (save) save.insertAdjacentElement('beforebegin', notice);
   }
 
+  function markPreparedButtons(caseId) {
+    const drafts = loadBulkDrafts(caseId);
+    const buttons = [...document.querySelectorAll('#main .record-button')];
+    buttons.forEach((button, index) => {
+      const day = index + 1;
+      if (!drafts[day]) return;
+      if (!button.textContent.includes('미작성')) return;
+      button.innerHTML = `${day}일차<br><small style="font-size:11px;font-weight:800">초안 준비 · 미저장</small>`;
+      button.style.background = '#eff6ff';
+      button.style.borderColor = '#93c5fd';
+      button.style.color = '#1d4ed8';
+    });
+  }
+
+  async function prepareAllDrafts(caseId, button) {
+    if (!isAdmin()) return;
+    const ok = window.confirm(
+      '전체 일차의 비어 있는 항목에 자동 초안을 준비하시겠습니까?\n\n' +
+      '기존 입력값·서비스 날짜·산모 서명은 건드리지 않습니다.\n' +
+      '각 일차를 열어 내용을 확인한 뒤 직접 저장해주세요.'
+    );
+    if (!ok) return;
+
+    if (button) button.disabled = true;
+    try {
+      const { data: rows, error } = await sb
+        .from('daily_records')
+        .select('service_day,locked,incision_status,breast_status,urination_bowel_status,sitz_bath,meal_count,snack_count,baby_temp,sleep_status,breastfeed_count,formula_count,formula_ml,stool_status,bath_cord_status,other_service,notes')
+        .eq('case_id', caseId)
+        .order('service_day');
+      if (error) throw error;
+
+      let totalDays = Number(
+        typeof currentCase !== 'undefined' && currentCase?.id === caseId
+          ? currentCase.service_days
+          : 0
+      );
+      if (!totalDays) {
+        const { data: serviceCase, error: caseError } = await sb
+          .from('service_cases')
+          .select('service_days')
+          .eq('id', caseId)
+          .single();
+        if (caseError) throw caseError;
+        totalDays = Number(serviceCase?.service_days || 0);
+      }
+
+      const actual = rows || [];
+      const byDay = new Map(actual.map((row) => [Number(row.service_day), row]));
+      const drafts = {};
+
+      for (let day = 1; day <= totalDays; day += 1) {
+        const row = byDay.get(day);
+        if (!recordNeedsDraft(row)) continue;
+
+        const previous = actual
+          .filter((item) => Number(item.service_day) < day)
+          .sort((a, b) => Number(b.service_day) - Number(a.service_day))
+          .slice(0, 5);
+
+        const hasPrevious = previous.length > 0;
+        drafts[day] = {
+          draft: hasPrevious ? buildFromPrevious(previous) : buildGenericThreeWeekDraft(),
+          basis: hasPrevious ? 'previous_records' : 'generic_three_week_draft',
+          reference_service_days: hasPrevious ? previous.map((item) => Number(item.service_day)) : [],
+          prepared_at: new Date().toISOString()
+        };
+      }
+
+      if (!saveBulkDrafts(caseId, drafts)) throw new Error('브라우저에 전체 초안을 저장하지 못했습니다.');
+
+      markPreparedButtons(caseId);
+
+      try {
+        await sb.from('record_audit').insert({
+          record_id: null,
+          case_id: caseId,
+          actor_id: me?.id || null,
+          action: 'admin_bulk_missing_record_drafts_prepared',
+          details: {
+            prepared_service_days: Object.keys(drafts).map(Number),
+            count: Object.keys(drafts).length
+          }
+        });
+      } catch (auditError) {
+        console.warn('bulk draft audit error', auditError);
+      }
+
+      alertMsg(
+        Object.keys(drafts).length
+          ? `총 ${Object.keys(drafts).length}개 일차의 빈칸 초안을 준비했습니다.\n\n각 일차를 열면 자동으로 채워져 보이며, 확인 후 저장해주세요.`
+          : '현재 자동으로 채울 빈칸이 없습니다.'
+      );
+    } catch (error) {
+      console.error(error);
+      alertMsg(`전체 초안을 준비하지 못했습니다. ${error?.message || ''}`);
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  function addBulkButton(caseId, adminMode) {
+    if (!adminMode || !isAdmin() || document.getElementById('adminBulkMissingDraft')) return;
+    const recordButtons = [...document.querySelectorAll('#main .record-button')];
+    const row = recordButtons[0]?.parentElement;
+    if (!row) return;
+
+    const wrap = document.createElement('div');
+    wrap.dataset.adminBulkDraft = '1';
+    wrap.style.marginTop = '10px';
+
+    const button = document.createElement('button');
+    button.id = 'adminBulkMissingDraft';
+    button.type = 'button';
+    button.className = 'secondary full';
+    button.textContent = '전체 빈칸 자동 채우기';
+    button.style.fontWeight = '900';
+    button.onclick = () => prepareAllDrafts(caseId, button);
+
+    const help = document.createElement('div');
+    help.className = 'muted tiny';
+    help.style.marginTop = '6px';
+    help.textContent = '전체 일차의 비어 있는 항목만 초안으로 준비합니다. 기존 입력값·서비스 날짜·서명은 유지되며, 실제 저장은 각 일차에서 확인 후 진행합니다.';
+
+    wrap.append(button, help);
+    row.insertAdjacentElement('afterend', wrap);
+    markPreparedButtons(caseId);
+  }
+
+  function applyPreparedBulkDraft(day) {
+    if (!isAdmin() || typeof currentCase === 'undefined' || !currentCase?.id) return;
+    if (typeof currentRecord !== 'undefined' && currentRecord?.locked) return;
+
+    const prepared = loadBulkDrafts(currentCase.id)?.[day];
+    if (!prepared?.draft) return;
+
+    applyDraft(prepared.draft);
+    const date = document.getElementById('serviceDate');
+    if (!currentRecord?.id && date) date.value = '';
+
+    addDraftNotice(
+      prepared.basis === 'previous_records'
+        ? `전체 초안 · 이전 ${prepared.reference_service_days?.length || 0}개 기록 참고`
+        : '전체 초안 · 이전 기록 없음 · 3주차 일반 초안값 적용'
+    );
+  }
+
   async function fillMissingDraft(day, button) {
     button.disabled = true;
     try {
@@ -229,8 +427,14 @@
     }
   }
 
+  window.openCase = async function openCaseWithBulkDraft(caseId, adminMode) {
+    await previousOpenCase(caseId, adminMode);
+    addBulkButton(caseId, Boolean(adminMode));
+  };
+
   window.openDay = async function openDayWithMissingDraft(day, adminMode) {
     await previousOpenDay(day, adminMode);
+    if (adminMode) applyPreparedBulkDraft(Number(day));
     decorate(Number(day), Boolean(adminMode));
   };
 })();
