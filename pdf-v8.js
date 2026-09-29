@@ -428,7 +428,21 @@
       if (!templateBytes.length) throw new Error('원본 PDF 파일이 비어 있습니다.');
       const doc = await PDFLib.PDFDocument.load(templateBytes, { ignoreEncryption: true, updateMetadata: false });
 
-      const need = Math.max(1, Math.ceil(Number(caseData.service_days || 0) / 5));
+      const contractedPages = Math.max(1, Math.ceil(Number(caseData.service_days || 0) / 5));
+      const recordedDays = [...new Set(
+        records
+          .map((record) => Number(record?.service_day))
+          .filter((day) => Number.isFinite(day) && day > 0)
+      )];
+      const lastRecordedDay = recordedDays.length ? Math.max(...recordedDays) : 0;
+
+      // 최종완성 처리된 건은 실제 작성된 마지막 이용일차까지만 PDF 페이지를 만든다.
+      // 예: 10일 -> 2장, 6일 -> 2장, 5일 -> 1장.
+      // 최종완성 전에는 기존처럼 등록된 서비스 기간 전체 페이지를 유지한다.
+      const need = caseData.final_completed_at
+        ? Math.max(1, Math.ceil(lastRecordedDay / 5))
+        : contractedPages;
+
       if (doc.getPageCount() < need) {
         throw new Error(`원본 PDF 페이지가 부족합니다. 필요 ${need}페이지 / 원본 ${doc.getPageCount()}페이지`);
       }
