@@ -88,12 +88,24 @@
     }
 
     const all = [...(data || [])].sort((a, b) => {
+      const am = startMonthKey(a.start_date);
+      const bm = startMonthKey(b.start_date);
+
+      if (am !== bm) {
+        if (am === 'unknown') return 1;
+        if (bm === 'unknown') return -1;
+        return bm.localeCompare(am);
+      }
+
       const ad = String(a.start_date || '');
       const bd = String(b.start_date || '');
-      if (ad !== bd) return bd.localeCompare(ad);
-      const at = a.final_completed_at ? new Date(a.final_completed_at).getTime() : 0;
-      const bt = b.final_completed_at ? new Date(b.final_completed_at).getTime() : 0;
-      return bt - at;
+      if (ad !== bd) {
+        if (!ad) return 1;
+        if (!bd) return -1;
+        return ad.localeCompare(bd);
+      }
+
+      return String(a.mother_name || '').localeCompare(String(b.mother_name || ''), 'ko');
     });
 
     const counts = {
@@ -148,7 +160,7 @@
     main().innerHTML = `
       <div class="card">
         <h3>최종완성</h3>
-        <div class="muted">최종 정리된 기록입니다. 지점별로 확인할 수 있으며, 각 지점 안에서는 <b>서비스 시작월</b> 기준으로 묶입니다.</div>
+        <div class="muted">최종 정리된 기록입니다. 지점별로 확인할 수 있으며, 각 지점 안에서는 <b>서비스 시작월</b> 기준으로 묶이고 같은 달은 시작일이 빠른 순서로 표시됩니다.</div>
         <div class="row mt" style="gap:7px;flex-wrap:wrap">
           <button type="button" class="${finalBranchFilter === 'all' ? 'primary' : 'secondary'}" data-final-folder="all">전체 ${counts.all}</button>
           <button type="button" class="${finalBranchFilter === 'bundang' ? 'primary' : 'secondary'}" data-final-folder="bundang">분당 ${counts.bundang}</button>
