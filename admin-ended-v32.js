@@ -36,6 +36,15 @@
     const rows = [...card.querySelectorAll(':scope > .case')];
     const ids = rows.map(rowCaseId).filter(Boolean);
     if (!ids.length) {
+      const title = card.querySelector('h3');
+      if (title && !card.querySelector('[data-active-count]')) {
+        const count = document.createElement('span');
+        count.dataset.activeCount = '1';
+        count.className = 'pill';
+        count.style.marginLeft = '8px';
+        count.textContent = '진행 중 0건';
+        title.appendChild(count);
+      }
       if (!card.querySelector('[data-active-empty]')) {
         const empty = document.createElement('p');
         empty.className = 'muted';
@@ -59,6 +68,16 @@
     });
 
     const remaining = card.querySelectorAll(':scope > .case').length;
+    const title = card.querySelector('h3');
+    card.querySelector('[data-active-count]')?.remove();
+    if (title) {
+      const count = document.createElement('span');
+      count.dataset.activeCount = '1';
+      count.className = 'pill';
+      count.style.marginLeft = '8px';
+      count.textContent = `진행 중 ${remaining}건`;
+      title.appendChild(count);
+    }
     card.querySelector('[data-active-empty]')?.remove();
     if (!remaining) {
       const empty = document.createElement('p');
