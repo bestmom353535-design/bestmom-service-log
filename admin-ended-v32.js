@@ -4,6 +4,7 @@
   if (typeof previousAdminCases !== 'function' || typeof previousShowAdminTab !== 'function') return;
 
   let endedBranchFilter = 'all';
+  let endedMonthFilter = 'all';
 
   function setActiveTab(tabName) {
     document.querySelectorAll('#adminNav [data-tab]').forEach((button) => {
@@ -254,6 +255,16 @@
       return true;
     });
 
+    const availableMonths = [...new Set(displayEnded.map((item) => monthKey(item.start_date)))];
+    if (endedMonthFilter !== 'all' && !availableMonths.includes(endedMonthFilter)) {
+      endedMonthFilter = 'all';
+    }
+
+    const monthVisibleEnded = displayEnded.filter((item) => {
+      if (endedMonthFilter === 'all') return true;
+      return monthKey(item.start_date) === endedMonthFilter;
+    });
+
     const recordCounts = {};
     if (ended.length) {
       const endedIds = ended.map((item) => item.id);
@@ -283,13 +294,13 @@
     }
 
     const groups = new Map();
-    displayEnded.forEach((item) => {
+    monthVisibleEnded.forEach((item) => {
       const key = monthKey(item.start_date);
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(item);
     });
 
-    const html = displayEnded.length ? [...groups.entries()].map(([key, items]) => `
+    const html = monthVisibleEnded.length ? [...groups.entries()].map(([key, items]) => `
       <div class="card" data-ended-month="${escapeHtml(key)}">
         <div class="row space">
           <h3 style="margin-bottom:0">${escapeHtml(monthLabel(key))}</h3>
@@ -343,15 +354,34 @@
           <button type="button" class="${endedBranchFilter === 'yongin' ? 'primary' : 'secondary'}" data-ended-folder="yongin">용인 ${folderCounts.yongin}</button>
           <button type="button" class="${endedBranchFilter === 'unassigned' ? 'primary' : 'secondary'}" data-ended-folder="unassigned">미분류 ${folderCounts.unassigned}</button>
         </div>
+        <div class="mt" style="max-width:280px">
+          <label for="endedMonthSelect">시작월 선택</label>
+          <select id="endedMonthSelect">
+            <option value="all" ${endedMonthFilter === 'all' ? 'selected' : ''}>전체 월 (${displayEnded.length}건)</option>
+            ${availableMonths.map((key) => {
+              const count = displayEnded.filter((item) => monthKey(item.start_date) === key).length;
+              return `<option value="${escapeHtml(key)}" ${endedMonthFilter === key ? 'selected' : ''}>${escapeHtml(monthLabel(key))} (${count}건)</option>`;
+            }).join('')}
+          </select>
+        </div>
       </div>
       ${html}`;
 
     document.querySelectorAll('[data-ended-folder]').forEach((button) => {
       button.onclick = async () => {
         endedBranchFilter = button.dataset.endedFolder || 'all';
+        endedMonthFilter = 'all';
         await renderEndedServices();
       };
     });
+
+    const endedMonthSelect = document.getElementById('endedMonthSelect');
+    if (endedMonthSelect) {
+      endedMonthSelect.onchange = async () => {
+        endedMonthFilter = endedMonthSelect.value || 'all';
+        await renderEndedServices();
+      };
+    }
 
     ended.forEach((c) => {
       const row = document.querySelector(`[data-ended-case="${c.id}"]`);
