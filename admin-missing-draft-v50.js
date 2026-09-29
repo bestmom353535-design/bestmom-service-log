@@ -1,6 +1,6 @@
 (() => {
-  if (window.__BESTMOM_ADMIN_MISSING_DRAFT_V56__) return;
-  window.__BESTMOM_ADMIN_MISSING_DRAFT_V56__ = true;
+  if (window.__BESTMOM_ADMIN_MISSING_DRAFT_V57__) return;
+  window.__BESTMOM_ADMIN_MISSING_DRAFT_V57__ = true;
 
   const previousOpenDay = window.openDay;
   const previousOpenCase = window.openCase;
@@ -55,7 +55,6 @@
     if (Number(row.formula_count) !== 0 && missingNumber(row.formula_ml)) return true;
     if (missingText(row.stool_status)) return true;
     if (missingText(row.bath_cord_status)) return true;
-    if (missingText(row.other_service)) return true;
     if (missingText(row.notes)) return true;
     return false;
   }
@@ -123,7 +122,6 @@
       formula_ml: formulaCount === 0 ? null : median(recent.map((r) => r.formula_ml)),
       stool_status: mode(recent.map((r) => r.stool_status), '정상변'),
       bath_cord_status: mode(recent.map((r) => r.bath_cord_status), '실시'),
-      other_service: mode(recent.map((r) => String(r.other_service || '').trim()).filter(Boolean), latest.other_service || '신생아 돌봄 및 산모 식사 지원'),
       notes: shortRepeatedNote(recent) || '수유 및 수면상태 양호함.'
     };
     return result;
@@ -144,7 +142,6 @@
       formula_ml: 70,
       stool_status: '정상변',
       bath_cord_status: '실시',
-      other_service: '신생아 돌봄 및 산모 식사 지원',
       notes: '수유 및 수면상태 양호함.'
     };
   }
@@ -181,7 +178,6 @@
     setField('fml', draft.formula_ml);
     setGroup('stool', draft.stool_status);
     setGroup('bath', draft.bath_cord_status);
-    setField('other', draft.other_service);
     setField('notes', draft.notes);
   }
 
@@ -214,7 +210,7 @@
     if (!isAdmin()) return;
     const ok = window.confirm(
       '전체 일차의 비어 있는 항목에 자동 초안을 준비하시겠습니까?\n\n' +
-      '기존 입력값·서비스 날짜·산모 서명은 건드리지 않습니다.\n' +
+      '기존 입력값·서비스 날짜·산모 서명·기타서비스는 건드리지 않습니다.\n' +
       '각 일차를 열어 내용을 확인한 뒤 직접 저장해주세요.'
     );
     if (!ok) return;
@@ -318,7 +314,7 @@
     const help = document.createElement('div');
     help.className = 'muted tiny';
     help.style.marginTop = '6px';
-    help.textContent = '전체 일차의 비어 있는 항목만 초안으로 준비합니다. 기존 입력값·서비스 날짜·서명은 유지되며, 실제 저장은 각 일차에서 확인 후 진행합니다.';
+    help.textContent = '전체 일차의 비어 있는 항목만 초안으로 준비합니다. 기존 입력값·서비스 날짜·서명·기타서비스는 유지되며, 실제 저장은 각 일차에서 확인 후 진행합니다.';
 
     wrap.append(button, help);
     row.insertAdjacentElement('afterend', wrap);
@@ -410,7 +406,7 @@
     const help = document.createElement('div');
     help.className = 'muted tiny';
     help.style.marginTop = '6px';
-    help.textContent = `현재 선택한 ${day}일차의 비어 있는 항목만 채웁니다. 앞선 기록이 있으면 참고하고, 없으면 3주차 일반 초안값을 사용합니다. 기존 입력값·서비스 날짜·서명은 건드리지 않습니다.`;
+    help.textContent = `현재 선택한 ${day}일차의 비어 있는 항목만 채웁니다. 앞선 기록이 있으면 참고하고, 없으면 3주차 일반 초안값을 사용합니다. 기존 입력값·서비스 날짜·서명·기타서비스는 건드리지 않습니다.`;
 
     save.insertAdjacentElement('beforebegin', button);
     button.insertAdjacentElement('afterend', help);
