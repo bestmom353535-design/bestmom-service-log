@@ -5,6 +5,7 @@
 
   let endedBranchFilter = 'all';
   let endedMonthFilter = 'all';
+  let endedReturnState = null;
 
   function setActiveTab(tabName) {
     document.querySelectorAll('#adminNav [data-tab]').forEach((button) => {
@@ -217,10 +218,20 @@
     }
   }
 
+  window.requestEndedListRestore = function requestEndedListRestore(caseId, scrollY = window.scrollY) {
+    endedReturnState = { caseId, scrollY: Number(scrollY) || 0 };
+  };
+
   window.openEndedRecord = async function openEndedRecord(caseId) {
+    const returnState = { caseId, scrollY: window.scrollY };
     await window.openCase(caseId, true);
     const back = document.getElementById('back');
-    if (back) back.onclick = () => renderEndedServices();
+    if (back) {
+      back.onclick = async () => {
+        endedReturnState = returnState;
+        await renderEndedServices();
+      };
+    }
   };
 
   async function renderEndedServices() {
@@ -436,6 +447,19 @@
       });
       if (deleteButton) deleteButton.onclick = () => deleteEnded(c.id, c.mother_name, deleteButton);
     });
+
+    if (endedReturnState) {
+      const state = endedReturnState;
+      endedReturnState = null;
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const row = document.querySelector(`[data-ended-case="${state.caseId}"]`);
+        if (row) {
+          row.scrollIntoView({ block: 'center', behavior: 'auto' });
+        } else {
+          window.scrollTo({ top: state.scrollY || 0, behavior: 'auto' });
+        }
+      }));
+    }
   }
 
   window.renderEndedServices = renderEndedServices;
