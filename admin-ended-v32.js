@@ -105,6 +105,9 @@
   }
 
   async function moveEndedToBranch(caseId, motherName, branch, button) {
+    const row = button?.closest?.('[data-ended-case]');
+    const alreadySelected = button?.classList?.contains('primary');
+    if (alreadySelected) return;
     if (button) button.disabled = true;
     try {
       const { error } = await sb
@@ -127,7 +130,6 @@
         console.warn('종료 서비스 지점 분류 이력 오류', auditError);
       }
 
-      alertMsg(`${motherName || '해당 산모'} 기록을 ${branchLabel(branch)} 폴더로 이동했습니다.`);
       await renderEndedServices();
     } catch (err) {
       console.error(err);
@@ -266,7 +268,6 @@
                 <b>${escapeHtml(c.mother_name)}</b>
                 <div class="muted">아기 ${escapeHtml(c.baby_name || '')} · 관리사 ${escapeHtml(c.caregiver?.full_name || '미지정')} · ${c.service_days}일</div>
                 <div class="muted tiny" style="margin-top:4px">종료 처리일 ${escapeHtml(dateLabel(c.completed_at))}</div>
-                <div style="margin-top:6px"><span style="display:inline-block;padding:3px 7px;border-radius:999px;background:#f3f4f6;color:#374151;font-size:11px;font-weight:800">${escapeHtml(branchLabel(c.branch))}</span></div>
               </div>
               <div style="text-align:right;white-space:nowrap">
                 <div style="font-size:13px;font-weight:800;color:${c.status === 'completed' ? '#166534' : '#92400e'}">
@@ -281,8 +282,8 @@
               <button class="secondary" type="button" data-ended-open="${c.id}">기록 보기</button>
               <button class="secondary" type="button" onclick="makePdf('${c.id}')">제공기록지 PDF 보기</button>
               ${c.status === 'stopped' ? `<button class="ok" type="button" data-ended-reopen="${c.id}">중도 종료 해제</button>` : ''}
-              <button class="secondary" type="button" data-ended-branch="bundang" data-case-id="${c.id}" ${c.branch === 'bundang' ? 'disabled' : ''}>분당으로 이동</button>
-              <button class="secondary" type="button" data-ended-branch="yongin" data-case-id="${c.id}" ${c.branch === 'yongin' ? 'disabled' : ''}>용인으로 이동</button>
+              <button class="${c.branch === 'bundang' ? 'primary' : 'secondary'}" type="button" data-ended-branch="bundang" data-case-id="${c.id}" style="width:auto;min-width:58px;padding-left:12px;padding-right:12px">분당</button>
+              <button class="${c.branch === 'yongin' ? 'primary' : 'secondary'}" type="button" data-ended-branch="yongin" data-case-id="${c.id}" style="width:auto;min-width:58px;padding-left:12px;padding-right:12px">용인</button>
               <button class="danger" type="button" data-ended-delete="${c.id}">삭제</button>
             </div>
           </div>`;
