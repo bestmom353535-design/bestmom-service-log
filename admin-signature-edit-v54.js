@@ -44,6 +44,7 @@
 
     let drawing = false;
     let dirty = false;
+    let hasContent = false;
 
     const point = (event) => {
       const r = canvas.getBoundingClientRect();
@@ -56,6 +57,8 @@
       const p = point(event);
       ctx.beginPath();
       ctx.moveTo(p.x, p.y);
+      dirty = true;
+      hasContent = true;
     };
 
     canvas.onpointermove = (event) => {
@@ -73,11 +76,14 @@
       ctx,
       rectWidth: rect.width,
       rectHeight: rect.height,
-      markDirty() { dirty = true; },
+      markDirty() { dirty = true; hasContent = true; },
+      setHasContent(value) { hasContent = Boolean(value); },
       isDirty() { return dirty; },
+      hasContent() { return hasContent; },
       clear() {
         ctx.clearRect(0, 0, rect.width, rect.height);
         dirty = true;
+        hasContent = false;
       }
     };
   }
@@ -94,6 +100,7 @@
     const drawW = image.width * ratio;
     const drawH = image.height * ratio;
     ctx.drawImage(image, (width - drawW) / 2, (height - drawH) / 2, drawW, drawH);
+    canvasState.setHasContent(true);
   }
 
   async function findPreviousSignature(day) {
@@ -193,6 +200,9 @@
     document.getElementById('adminSignatureCancel').onclick = removeEditor;
 
     document.getElementById('adminSignatureSave').onclick = async () => {
+      if (!state.hasContent()) {
+        return alertMsg('서명을 작성하거나 이전 서명을 불러와주세요.');
+      }
       if (!state.isDirty() && record.signature_data) {
         return alertMsg('수정된 서명이 없습니다.');
       }
