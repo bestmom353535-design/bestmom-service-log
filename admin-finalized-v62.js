@@ -161,6 +161,7 @@
               </div>
               <div class="row mt">
                 <button class="secondary" type="button" data-final-edit="${c.id}">수정</button>
+                <button class="secondary" type="button" onclick="makePdf('${c.id}')">완성된 PDF 보기</button>
               </div>
             </div>
           `).join('')}
