@@ -88,7 +88,7 @@
   }
 
   function monthLabel(key) {
-    if (key === 'unknown') return '종료일 미확인';
+    if (key === 'unknown') return '시작일 미확인';
     const [year, month] = key.split('-');
     return `${year}년 ${Number(month)}월`;
   }
@@ -220,9 +220,24 @@
     }
 
     const ended = [...(data || [])].sort((a, b) => {
-      const at = a.completed_at ? new Date(a.completed_at).getTime() : -1;
-      const bt = b.completed_at ? new Date(b.completed_at).getTime() : -1;
-      return bt - at;
+      const am = monthKey(a.start_date);
+      const bm = monthKey(b.start_date);
+
+      if (am !== bm) {
+        if (am === 'unknown') return 1;
+        if (bm === 'unknown') return -1;
+        return bm.localeCompare(am);
+      }
+
+      const ad = String(a.start_date || '');
+      const bd = String(b.start_date || '');
+      if (ad !== bd) {
+        if (!ad) return 1;
+        if (!bd) return -1;
+        return ad.localeCompare(bd);
+      }
+
+      return String(a.mother_name || '').localeCompare(String(b.mother_name || ''), 'ko');
     });
 
     const folderCounts = {
@@ -269,7 +284,7 @@
 
     const groups = new Map();
     displayEnded.forEach((item) => {
-      const key = monthKey(item.completed_at);
+      const key = monthKey(item.start_date);
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(item);
     });
@@ -289,7 +304,7 @@
               <div>
                 <b>${escapeHtml(c.mother_name)}</b>
                 <div class="muted">아기 ${escapeHtml(c.baby_name || '')} · 관리사 ${escapeHtml(c.caregiver?.full_name || '미지정')} · ${c.service_days}일</div>
-                <div class="muted tiny" style="margin-top:4px">종료 처리일 ${escapeHtml(dateLabel(c.completed_at))}</div>
+                <div class="muted tiny" style="margin-top:4px">시작일 ${escapeHtml(dateLabel(c.start_date))} · 종료 처리일 ${escapeHtml(dateLabel(c.completed_at))}</div>
               </div>
               <div style="text-align:right;white-space:nowrap">
                 <div style="font-size:13px;font-weight:800;color:${c.status === 'completed' ? '#166534' : '#92400e'}">
@@ -319,7 +334,7 @@
         <div class="row space" style="align-items:flex-start">
           <div>
             <h3>종료 서비스</h3>
-            <div class="muted">서비스 완료 및 중도 종료된 건을 <b>종료 처리한 달</b> 기준으로 모았습니다. 최근 종료 월부터 표시됩니다.</div>
+            <div class="muted">서비스 완료 및 중도 종료된 건을 <b>서비스 시작월</b> 기준으로 모았습니다. 최근 시작월부터 표시되며, 같은 달 안에서는 시작일이 빠른 순서로 표시됩니다.</div>
           </div>
         </div>
         <div class="row mt" style="gap:7px;flex-wrap:wrap">
