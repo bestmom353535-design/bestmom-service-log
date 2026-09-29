@@ -1,6 +1,6 @@
 (() => {
-  if (window.__BESTMOM_ADMIN_CASE_EDIT_V62__) return;
-  window.__BESTMOM_ADMIN_CASE_EDIT_V62__ = true;
+  if (window.__BESTMOM_ADMIN_CASE_EDIT_V69__) return;
+  window.__BESTMOM_ADMIN_CASE_EDIT_V69__ = true;
 
   const CHOSEONG = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
   const consonantRe = /^[ㄱ-ㅎ]$/;
@@ -274,8 +274,14 @@
           removeModal();
           alertMsg('서비스 정보를 수정했습니다. 기존 기록과 서명은 그대로 유지됩니다.');
           if (serviceCase.final_completed_at && typeof window.renderFinalCompletedServices === 'function') {
+            if (typeof window.requestFinalListRestore === 'function') {
+              window.requestFinalListRestore(caseId);
+            }
             await window.renderFinalCompletedServices();
           } else if (['completed', 'stopped'].includes(serviceCase.status) && typeof window.renderEndedServices === 'function') {
+            if (typeof window.requestEndedListRestore === 'function') {
+              window.requestEndedListRestore(caseId);
+            }
             await window.renderEndedServices();
           } else if (typeof adminCases === 'function') {
             await adminCases();
