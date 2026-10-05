@@ -241,15 +241,78 @@
     return promise;
   }
 
+  function signatureInkBounds(img) {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, img.naturalWidth || img.width || 1);
+      canvas.height = Math.max(1, img.naturalHeight || img.height || 1);
+      const scan = canvas.getContext('2d', { willReadFrequently: true });
+      if (!scan) return null;
+
+      scan.clearRect(0, 0, canvas.width, canvas.height);
+      scan.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const pixels = scan.getImageData(0, 0, canvas.width, canvas.height).data;
+
+      let minX = canvas.width, minY = canvas.height, maxX = -1, maxY = -1;
+      for (let y = 0; y < canvas.height; y += 1) {
+        for (let x = 0; x < canvas.width; x += 1) {
+          const i = (y * canvas.width + x) * 4;
+          const a = pixels[i + 3];
+          if (a <= 12) continue;
+
+          const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
+          const brightness = (r + g + b) / 3;
+          if (brightness >= 246) continue;
+
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+
+      if (maxX < minX || maxY < minY) return null;
+
+      const sourcePad = 4;
+      const sx = Math.max(0, minX - sourcePad);
+      const sy = Math.max(0, minY - sourcePad);
+      const ex = Math.min(canvas.width - 1, maxX + sourcePad);
+      const ey = Math.min(canvas.height - 1, maxY + sourcePad);
+      return {
+        sx,
+        sy,
+        sw: Math.max(1, ex - sx + 1),
+        sh: Math.max(1, ey - sy + 1)
+      };
+    } catch (error) {
+      console.warn('signature crop error', error);
+      return null;
+    }
+  }
+
   async function drawSignature(ctx, src, rect, serviceDay) {
     if (!src) return;
     const img = await loadImage(src, `${serviceDay}일차 서명`);
-    const pad = 4;
-    const maxW = rect[2] - rect[0] - pad * 2;
-    const maxH = rect[3] - rect[1] - pad * 2;
-    const ratio = Math.min(maxW / img.width, maxH / img.height);
-    const w = img.width * ratio, h = img.height * ratio;
-    ctx.drawImage(img, rect[0] + (rect[2] - rect[0] - w) / 2, rect[1] + (rect[3] - rect[1] - h) / 2, w, h);
+    const crop = signatureInkBounds(img);
+    const sourceWidth = crop?.sw || img.width;
+    const sourceHeight = crop?.sh || img.height;
+
+    // PDF 서명칸을 최대한 활용하되 테두리와 겹치지 않도록 아주 작은 여백만 둔다.
+    const padX = 1.4;
+    const padY = 1.0;
+    const maxW = rect[2] - rect[0] - padX * 2;
+    const maxH = rect[3] - rect[1] - padY * 2;
+    const ratio = Math.min(maxW / sourceWidth, maxH / sourceHeight);
+    const w = sourceWidth * ratio;
+    const h = sourceHeight * ratio;
+    const dx = rect[0] + (rect[2] - rect[0] - w) / 2;
+    const dy = rect[1] + (rect[3] - rect[1] - h) / 2;
+
+    if (crop) {
+      ctx.drawImage(img, crop.sx, crop.sy, crop.sw, crop.sh, dx, dy, w, h);
+    } else {
+      ctx.drawImage(img, dx, dy, w, h);
+    }
   }
 
   async function canvasPngBytes(canvas) {
