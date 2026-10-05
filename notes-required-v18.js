@@ -12,11 +12,11 @@
     if (!notes || !checkbox) return;
 
     if (checkbox.checked) {
-      notes.value = '없음';
+      notes.value = '이상없음';
       notes.readOnly = true;
       notes.style.background = '#f8fafc';
     } else {
-      if (String(notes.value || '').trim() === '없음') notes.value = '';
+      if (['없음','이상없음'].includes(String(notes.value || '').trim())) notes.value = '';
       notes.readOnly = false;
       notes.style.background = '';
     }
@@ -34,11 +34,11 @@
 
     const wrap = document.createElement('label');
     wrap.style.cssText = 'display:inline-flex;align-items:center;gap:6px;margin-left:10px;font-weight:700;font-size:13px;cursor:pointer;vertical-align:middle;';
-    wrap.innerHTML = '<input id="notesNone" type="checkbox" style="width:18px;height:18px;min-height:0;margin:0"> <span>없음</span>';
+    wrap.innerHTML = '<input id="notesNone" type="checkbox" style="width:18px;height:18px;min-height:0;margin:0"> <span>이상없음</span>';
     label.appendChild(wrap);
 
     const checkbox = wrap.querySelector('#notesNone');
-    checkbox.checked = String(notes.value || '').trim() === '없음';
+    checkbox.checked = ['없음','이상없음'].includes(String(notes.value || '').trim());
     checkbox.disabled = Boolean(notes.disabled);
     checkbox.addEventListener('change', syncNotesNoneState);
 
@@ -53,7 +53,7 @@
     if (!notes || notes.disabled) return true;
 
     if (notesNoneChecked()) {
-      if (String(notes.value || '').trim() !== '없음') notes.value = '없음';
+      if (String(notes.value || '').trim() !== '없음') notes.value = '이상없음';
       return true;
     }
 
@@ -61,7 +61,7 @@
     const hasRealText = /[가-힣ㄱ-ㅎㅏ-ㅣA-Za-z0-9]/.test(value);
     if (hasRealText) return true;
 
-    alert('특이사항을 입력하거나 없음에 체크해주세요.');
+    alert('특이사항을 입력하거나 이상없음에 체크해주세요.');
     notes.focus();
     notes.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return false;
