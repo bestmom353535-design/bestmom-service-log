@@ -1,6 +1,6 @@
 (() => {
-  if (window.__BESTMOM_ADMIN_COMPLETE_V42__) return;
-  window.__BESTMOM_ADMIN_COMPLETE_V42__ = true;
+  if (window.__BESTMOM_ADMIN_COMPLETE_V83__) return;
+  window.__BESTMOM_ADMIN_COMPLETE_V83__ = true;
 
   let scanTimer = null;
   let scanning = false;
@@ -71,7 +71,7 @@
     if (!mainEl) return;
 
     const card = [...mainEl.querySelectorAll('.card')].find(
-      (el) => el.querySelector('h3')?.textContent?.trim() === '서비스 현황'
+      (el) => el.querySelector('h3')?.textContent?.trim()?.startsWith('서비스 현황')
     );
     if (!card) return;
 
