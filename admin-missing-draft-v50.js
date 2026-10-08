@@ -1,12 +1,12 @@
 (() => {
-  if (window.__BESTMOM_ADMIN_MISSING_DRAFT_V81__) return;
-  window.__BESTMOM_ADMIN_MISSING_DRAFT_V81__ = true;
+  if (window.__BESTMOM_ADMIN_MISSING_DRAFT_V82__) return;
+  window.__BESTMOM_ADMIN_MISSING_DRAFT_V82__ = true;
 
   const previousOpenDay = window.openDay;
   const previousOpenCase = window.openCase;
   if (typeof previousOpenDay !== 'function' || typeof previousOpenCase !== 'function') return;
 
-  const BULK_STORAGE_PREFIX = 'bestmom_bulk_record_drafts_v81_';
+  const BULK_STORAGE_PREFIX = 'bestmom_bulk_record_drafts_v82_';
 
   function isAdmin() {
     return typeof me !== 'undefined' && me?.role === 'admin';
@@ -491,7 +491,7 @@
         '1일차 기록을 기준으로 나머지 빈 일차의 자동 초안을 만들까요?\n\n' +
         '수유 방식·수유량·체온·식사/간식 횟수·특이사항 말투를 1일차 흐름에 맞춰 조금씩 다르게 제안합니다.\n' +
         '날짜는 1일차 실제 서비스 날짜부터 주말과 2026년 공휴일을 제외해 이어집니다.\n' +
-        '자동 초안은 바로 확정 저장하지 않으며 각 일차에서 확인 후 저장합니다.'
+        '자동 입력된 나머지 일차는 바로 저장되며, 이후 각 일차에서 내용을 확인·수정할 수 있습니다.'
       );
       if (!ok) return;
 
@@ -530,29 +530,63 @@
         };
       }
 
-      if (!saveBulkDrafts(caseId, drafts)) throw new Error('브라우저에 전체 초안을 저장하지 못했습니다.');
-      markPreparedButtons(caseId);
+      const preparedDays = Object.keys(drafts).map(Number).sort((a, b) => a - b);
+      const savedDays = [];
+
+      for (const day of preparedDays) {
+        const prepared = drafts[day];
+        const row = byDay.get(Number(day));
+        const payload = mergeAutoRecord(
+          caseId,
+          Number(day),
+          row,
+          prepared.draft,
+          prepared.service_date
+        );
+
+        let result;
+        if (row?.id) {
+          result = await sb
+            .from('daily_records')
+            .update(payload)
+            .eq('id', row.id)
+            .select()
+            .single();
+        } else {
+          result = await sb
+            .from('daily_records')
+            .insert(payload)
+            .select()
+            .single();
+        }
+        if (result.error) throw result.error;
+
+        savedDays.push(Number(day));
+        byDay.set(Number(day), result.data);
+      }
+
+      saveBulkDrafts(caseId, {});
 
       try {
         await sb.from('record_audit').insert({
           record_id: null,
           case_id: caseId,
           actor_id: me?.id || null,
-          action: 'admin_day1_based_bulk_drafts_prepared',
+          action: 'admin_day1_based_bulk_records_autosaved',
           details: {
-            prepared_service_days: Object.keys(drafts).map(Number),
+            saved_service_days: savedDays,
             first_service_date: firstServiceDate,
             auto_date_rule: 'weekdays_excluding_2026_official_public_holidays',
-            count: Object.keys(drafts).length
+            count: savedDays.length
           }
         });
       } catch (auditError) {
-        console.warn('day1 bulk draft audit error', auditError);
+        console.warn('day1 bulk autosave audit error', auditError);
       }
 
-      if (Object.keys(drafts).length) {
+      if (savedDays.length) {
         alertMsg(
-          `1일차 기록을 기준으로 총 ${Object.keys(drafts).length}개 일차의 초안을 준비했습니다.\n\n각 일차를 열어 실제 내용과 날짜를 확인한 뒤 저장해주세요.`
+          `1일차 기록을 기준으로 총 ${savedDays.length}개 일차를 자동 입력하고 저장했습니다.\n\n이제 ‘1일차 서명 전체 적용’을 누르면 저장된 일차 전체에 서명을 적용할 수 있습니다.`
         );
         await window.openCase(caseId, true);
       } else {
@@ -580,14 +614,14 @@
     button.id = 'adminBulkMissingDraft';
     button.type = 'button';
     button.className = 'secondary full';
-    button.textContent = '1일차 기준 전체 초안 만들기';
+    button.textContent = '1일차 기준 전체 자동 입력';
     button.style.fontWeight = '900';
     button.onclick = () => prepareAllDrafts(caseId, button);
 
     const help = document.createElement('div');
     help.className = 'muted tiny';
     help.style.marginTop = '6px';
-    help.textContent = '1일차를 저장한 뒤 사용합니다. 수유방법·수유량·체온·식사/간식·특이사항 말투를 1일차 기준으로 조금씩 다르게 초안 제안하며, 날짜는 주말·2026년 공휴일을 제외합니다.';
+    help.textContent = '1일차를 저장한 뒤 사용합니다. 1일차 흐름을 기준으로 나머지 일차를 조금씩 다르게 자동 입력하고 저장하며, 날짜는 주말·2026년 공휴일을 제외합니다.';
 
     wrap.append(button, help);
     row.insertAdjacentElement('afterend', wrap);
