@@ -208,19 +208,19 @@
   function buildFromPrevious(records, usedNotes = null) {
     const recent = records.slice(0, 5);
     const latest = recent[0] || {};
-    const formulaCount = median(recent.map((r) => r.formula_count));
+    const formulaCount = median(recent.map((r) => r.formula_count)) ?? 2;
     const result = {
       incision_status: modeArray(recent.map((r) => r.incision_status), ['이상없음']),
       breast_status: modeArray(recent.map((r) => r.breast_status), ['이상없음']),
       urination_bowel_status: modeArray(recent.map((r) => r.urination_bowel_status), ['이상없음']),
-      sitz_bath: mode(recent.map((r) => r.sitz_bath), null),
-      meal_count: median(recent.map((r) => r.meal_count)),
-      snack_count: median(recent.map((r) => r.snack_count)),
-      baby_temp: median(recent.map((r) => r.baby_temp)),
+      sitz_bath: mode(recent.map((r) => r.sitz_bath), '미실시'),
+      meal_count: median(recent.map((r) => r.meal_count)) ?? 3,
+      snack_count: median(recent.map((r) => r.snack_count)) ?? 1,
+      baby_temp: median(recent.map((r) => r.baby_temp)) ?? 36.7,
       sleep_status: mode(recent.map((r) => r.sleep_status), '잘잠'),
-      breastfeed_count: median(recent.map((r) => r.breastfeed_count)),
+      breastfeed_count: median(recent.map((r) => r.breastfeed_count)) ?? 6,
       formula_count: formulaCount,
-      formula_ml: formulaCount === 0 ? null : median(recent.map((r) => r.formula_ml)),
+      formula_ml: formulaCount === 0 ? null : (median(recent.map((r) => r.formula_ml)) ?? 70),
       stool_status: mode(recent.map((r) => r.stool_status), '정상변'),
       bath_cord_status: mode(recent.map((r) => r.bath_cord_status), '실시'),
       notes: variedNote(recent, usedNotes)
