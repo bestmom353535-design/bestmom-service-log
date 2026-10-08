@@ -1,6 +1,6 @@
 (() => {
-  if (window.__BESTMOM_ADMIN_SIGNATURE_EDIT_V54__) return;
-  window.__BESTMOM_ADMIN_SIGNATURE_EDIT_V54__ = true;
+  if (window.__BESTMOM_ADMIN_SIGNATURE_EDIT_V75__) return;
+  window.__BESTMOM_ADMIN_SIGNATURE_EDIT_V75__ = true;
 
   const previousOpenDay = window.openDay;
   if (typeof previousOpenDay !== 'function') return;
@@ -252,6 +252,9 @@
 
         currentRecord = updated;
         alertMsg('산모 서명을 수정했습니다.');
+        if (typeof window.refreshRecordStatus === 'function') {
+          await window.refreshRecordStatus(currentCase?.id);
+        }
         await window.openDay(day, true);
       } catch (error) {
         console.error(error);
