@@ -1,12 +1,12 @@
 (() => {
-  if (window.__BESTMOM_ADMIN_MISSING_DRAFT_V73__) return;
-  window.__BESTMOM_ADMIN_MISSING_DRAFT_V73__ = true;
+  if (window.__BESTMOM_ADMIN_MISSING_DRAFT_V75__) return;
+  window.__BESTMOM_ADMIN_MISSING_DRAFT_V75__ = true;
 
   const previousOpenDay = window.openDay;
   const previousOpenCase = window.openCase;
   if (typeof previousOpenDay !== 'function' || typeof previousOpenCase !== 'function') return;
 
-  const BULK_STORAGE_PREFIX = 'bestmom_bulk_record_drafts_v73_';
+  const BULK_STORAGE_PREFIX = 'bestmom_bulk_record_drafts_v75_';
 
   function isAdmin() {
     return typeof me !== 'undefined' && me?.role === 'admin';
@@ -92,6 +92,44 @@
     if (missingText(row.bath_cord_status)) return true;
     if (missingText(row.notes)) return true;
     return false;
+  }
+
+  function filledArray(value) {
+    return Array.isArray(value) && value.length > 0;
+  }
+
+  function filledText(value) {
+    return String(value || '').trim() !== '';
+  }
+
+  function filledNumber(value) {
+    return value !== null && value !== undefined && value !== '';
+  }
+
+  function mergeAutoRecord(caseId, day, row, draft, serviceDate) {
+    const formulaCount = filledNumber(row?.formula_count) ? row.formula_count : draft.formula_count;
+    return {
+      case_id: caseId,
+      service_day: Number(day),
+      service_date: row?.service_date || serviceDate,
+      incision_status: filledArray(row?.incision_status) ? row.incision_status : (draft.incision_status || []),
+      breast_status: filledArray(row?.breast_status) ? row.breast_status : (draft.breast_status || []),
+      urination_bowel_status: filledArray(row?.urination_bowel_status) ? row.urination_bowel_status : (draft.urination_bowel_status || []),
+      sitz_bath: filledText(row?.sitz_bath) ? row.sitz_bath : (draft.sitz_bath || null),
+      meal_count: filledNumber(row?.meal_count) ? row.meal_count : draft.meal_count,
+      snack_count: filledNumber(row?.snack_count) ? row.snack_count : draft.snack_count,
+      baby_temp: filledNumber(row?.baby_temp) ? row.baby_temp : draft.baby_temp,
+      sleep_status: filledText(row?.sleep_status) ? row.sleep_status : (draft.sleep_status || null),
+      breastfeed_count: filledNumber(row?.breastfeed_count) ? row.breastfeed_count : draft.breastfeed_count,
+      formula_count: formulaCount,
+      formula_ml: filledNumber(row?.formula_ml)
+        ? row.formula_ml
+        : (Number(formulaCount) === 0 ? null : draft.formula_ml),
+      stool_status: filledText(row?.stool_status) ? row.stool_status : (draft.stool_status || null),
+      bath_cord_status: filledText(row?.bath_cord_status) ? row.bath_cord_status : (draft.bath_cord_status || null),
+      other_service: row?.other_service || null,
+      notes: filledText(row?.notes) ? row.notes : (draft.notes || null)
+    };
   }
 
   function values(arr) {
@@ -272,10 +310,10 @@
   async function prepareAllDrafts(caseId, button) {
     if (!isAdmin()) return;
     const ok = window.confirm(
-      '전체 일차의 비어 있는 항목에 자동 초안을 준비하시겠습니까?\n\n' +
+      '전체 일차의 빈칸을 자동으로 채우고 바로 저장하시겠습니까?\n\n' +
       '기존 입력값·산모 서명·기타서비스는 건드리지 않습니다.\n' +
       '빈 서비스 날짜는 시작일 기준 평일(월~금) 순서로 자동 입력합니다.\n' +
-      '각 일차를 열어 내용을 확인한 뒤 직접 저장해주세요.'
+      '저장 후 각 일차를 열어 바로 산모 서명을 입력하거나 수정할 수 있습니다.'
     );
     if (!ok) return;
 
@@ -305,19 +343,24 @@
 
       const totalDays = Number(serviceMeta?.service_days || 0);
       const startDate = serviceMeta?.start_date || null;
+      if (!startDate) {
+        throw new Error('서비스 시작일이 없습니다. 서비스 정보 수정에서 시작일을 먼저 입력해주세요.');
+      }
 
       const actual = rows || [];
       const byDay = new Map(actual.map((row) => [Number(row.service_day), row]));
-      const drafts = {};
       const usedAutoNotes = new Set(
         actual.map((row) => String(row.notes || '').trim()).filter(Boolean)
       );
+      const savedDays = [];
+      const generatedRows = [];
 
       for (let day = 1; day <= totalDays; day += 1) {
         const row = byDay.get(day);
         if (!recordNeedsDraft(row)) continue;
+        if (row?.locked) continue;
 
-        const previous = actual
+        const previous = [...actual, ...generatedRows]
           .filter((item) => Number(item.service_day) < day)
           .sort((a, b) => Number(b.service_day) - Number(a.service_day))
           .slice(0, 5);
@@ -328,41 +371,60 @@
           : buildGenericThreeWeekDraft(usedAutoNotes);
         if (generatedDraft.notes) usedAutoNotes.add(generatedDraft.notes);
 
-        drafts[day] = {
-          draft: generatedDraft,
-          service_date: row?.service_date || weekdayDateForServiceDay(startDate, day) || null,
-          basis: hasPrevious ? 'previous_records' : 'generic_three_week_draft',
-          reference_service_days: hasPrevious ? previous.map((item) => Number(item.service_day)) : [],
-          prepared_at: new Date().toISOString()
-        };
+        const serviceDate = row?.service_date || weekdayDateForServiceDay(startDate, day);
+        if (!serviceDate) continue;
+
+        const payload = mergeAutoRecord(caseId, day, row, generatedDraft, serviceDate);
+
+        let result;
+        if (row?.id) {
+          result = await sb
+            .from('daily_records')
+            .update(payload)
+            .eq('id', row.id)
+            .select()
+            .single();
+        } else {
+          result = await sb
+            .from('daily_records')
+            .insert(payload)
+            .select()
+            .single();
+        }
+        if (result.error) throw result.error;
+
+        savedDays.push(Number(day));
+        generatedRows.push(result.data);
+        byDay.set(Number(day), result.data);
       }
 
-      if (!saveBulkDrafts(caseId, drafts)) throw new Error('브라우저에 전체 초안을 저장하지 못했습니다.');
-
-      markPreparedButtons(caseId);
+      saveBulkDrafts(caseId, {});
 
       try {
         await sb.from('record_audit').insert({
           record_id: null,
           case_id: caseId,
           actor_id: me?.id || null,
-          action: 'admin_bulk_missing_record_drafts_prepared',
+          action: 'admin_bulk_missing_records_autosaved',
           details: {
-            prepared_service_days: Object.keys(drafts).map(Number),
+            saved_service_days: savedDays,
             auto_date_start: startDate,
             auto_date_rule: 'weekdays_mon_fri',
-            count: Object.keys(drafts).length
+            count: savedDays.length
           }
         });
       } catch (auditError) {
-        console.warn('bulk draft audit error', auditError);
+        console.warn('bulk autosave audit error', auditError);
       }
 
-      alertMsg(
-        Object.keys(drafts).length
-          ? `총 ${Object.keys(drafts).length}개 일차의 빈칸 초안을 준비했습니다.\n\n빈 날짜도 시작일 기준 평일 순서로 함께 채워집니다. 각 일차를 열어 확인 후 저장해주세요.`
-          : '현재 자동으로 채울 빈칸이 없습니다.'
-      );
+      if (savedDays.length) {
+        alertMsg(
+          `총 ${savedDays.length}개 일차의 빈칸을 채우고 바로 저장했습니다.\n\n각 일차를 열면 기록 저장을 다시 누르지 않고 바로 산모 서명을 입력·수정할 수 있습니다.`
+        );
+        await window.openCase(caseId, true);
+      } else {
+        alertMsg('현재 자동으로 채울 빈칸이 없습니다.');
+      }
     } catch (error) {
       console.error(error);
       alertMsg(`전체 초안을 준비하지 못했습니다. ${error?.message || ''}`);
@@ -392,7 +454,7 @@
     const help = document.createElement('div');
     help.className = 'muted tiny';
     help.style.marginTop = '6px';
-    help.textContent = '전체 일차의 비어 있는 항목을 초안으로 준비하고, 빈 서비스 날짜는 시작일 기준 평일 순서로 채웁니다. 기존 입력값·서명·기타서비스는 유지됩니다.';
+    help.textContent = '전체 일차의 빈칸과 빈 날짜를 자동으로 채운 뒤 바로 저장합니다. 기존 입력값·서명·기타서비스는 유지되며, 이후 각 일차에서 바로 서명을 입력할 수 있습니다.';
 
     wrap.append(button, help);
     row.insertAdjacentElement('afterend', wrap);
