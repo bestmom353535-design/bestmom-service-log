@@ -1,12 +1,12 @@
 (() => {
-  if (window.__BESTMOM_ADMIN_MISSING_DRAFT_V78__) return;
-  window.__BESTMOM_ADMIN_MISSING_DRAFT_V78__ = true;
+  if (window.__BESTMOM_ADMIN_MISSING_DRAFT_V79__) return;
+  window.__BESTMOM_ADMIN_MISSING_DRAFT_V79__ = true;
 
   const previousOpenDay = window.openDay;
   const previousOpenCase = window.openCase;
   if (typeof previousOpenDay !== 'function' || typeof previousOpenCase !== 'function') return;
 
-  const BULK_STORAGE_PREFIX = 'bestmom_bulk_record_drafts_v78_';
+  const BULK_STORAGE_PREFIX = 'bestmom_bulk_record_drafts_v79_';
 
   function isAdmin() {
     return typeof me !== 'undefined' && me?.role === 'admin';
@@ -53,7 +53,7 @@
     '2026-01-01',
     '2026-02-16', '2026-02-17', '2026-02-18',
     '2026-03-01', '2026-03-02',
-    '2026-05-05', '2026-05-24', '2026-05-25',
+    '2026-05-01', '2026-05-05', '2026-05-24', '2026-05-25',
     '2026-06-03', '2026-06-06',
     '2026-07-17',
     '2026-08-15', '2026-08-17',
@@ -183,6 +183,14 @@
     return mode(normalized, fallback);
   }
 
+  function pickActual(records, field) {
+    const available = (records || [])
+      .map((row) => row?.[field])
+      .filter((value) => value !== null && value !== undefined && value !== '');
+    if (!available.length) return null;
+    return available[Math.floor(Math.random() * available.length)];
+  }
+
   const NOTE_VARIATIONS = {
     memo: [
       '아기 잘 먹고 잘 잤음',
@@ -278,20 +286,19 @@
 
   function buildFromPrevious(records, usedNotes = null, motherName = '') {
     const recent = records.slice(0, 5);
-    const latest = recent[0] || {};
-    const formulaCount = median(recent.map((r) => r.formula_count)) ?? 2;
+    const formulaCount = pickActual(recent, 'formula_count');
     const result = {
       incision_status: modeArray(recent.map((r) => r.incision_status), ['이상없음']),
       breast_status: modeArray(recent.map((r) => r.breast_status), ['이상없음']),
       urination_bowel_status: modeArray(recent.map((r) => r.urination_bowel_status), ['이상없음']),
       sitz_bath: mode(recent.map((r) => r.sitz_bath), '미실시'),
-      meal_count: median(recent.map((r) => r.meal_count)) ?? 3,
-      snack_count: median(recent.map((r) => r.snack_count)) ?? 1,
-      baby_temp: median(recent.map((r) => r.baby_temp)) ?? 36.7,
+      meal_count: pickActual(recent, 'meal_count'),
+      snack_count: pickActual(recent, 'snack_count'),
+      baby_temp: pickActual(recent, 'baby_temp'),
       sleep_status: mode(recent.map((r) => r.sleep_status), '잘잠'),
-      breastfeed_count: median(recent.map((r) => r.breastfeed_count)) ?? 6,
+      breastfeed_count: pickActual(recent, 'breastfeed_count'),
       formula_count: formulaCount,
-      formula_ml: formulaCount === 0 ? null : (median(recent.map((r) => r.formula_ml)) ?? 70),
+      formula_ml: formulaCount === 0 ? null : pickActual(recent, 'formula_ml'),
       stool_status: mode(recent.map((r) => r.stool_status), '정상변'),
       bath_cord_status: mode(recent.map((r) => r.bath_cord_status), '실시'),
       notes: variedNote(recent, usedNotes, motherName)
@@ -305,13 +312,13 @@
       breast_status: ['이상없음'],
       urination_bowel_status: ['이상없음'],
       sitz_bath: '미실시',
-      meal_count: 3,
-      snack_count: 1,
-      baby_temp: 36.7,
+      meal_count: null,
+      snack_count: null,
+      baby_temp: null,
       sleep_status: '잘잠',
-      breastfeed_count: 6,
-      formula_count: 2,
-      formula_ml: 70,
+      breastfeed_count: null,
+      formula_count: null,
+      formula_ml: null,
       stool_status: '정상변',
       bath_cord_status: '실시',
       notes: variedNote([], usedNotes, motherName)
@@ -383,7 +390,7 @@
     const ok = window.confirm(
       '전체 일차의 빈칸을 자동으로 채우고 바로 저장하시겠습니까?\n\n' +
       '기존 입력값·산모 서명·기타서비스는 건드리지 않습니다.\n' +
-      '빈 서비스 날짜는 시작일 기준으로 주말과 2026년 공휴일을 제외해 자동 입력합니다.\n' +
+      '빈 서비스 날짜는 시작일 기준으로 주말과 2026년 공휴일·대체공휴일·명절·선거일을 제외해 자동 입력합니다.\n' +
       '저장 후 각 일차를 열어 바로 산모 서명을 입력하거나 수정할 수 있습니다.'
     );
     if (!ok) return;
@@ -525,7 +532,7 @@
     const help = document.createElement('div');
     help.className = 'muted tiny';
     help.style.marginTop = '6px';
-    help.textContent = '전체 일차의 빈칸과 빈 날짜를 자동으로 채운 뒤 바로 저장합니다. 기존 입력값·서명·기타서비스는 유지되며, 이후 각 일차에서 바로 서명을 입력할 수 있습니다.';
+    help.textContent = '전체 일차의 빈칸과 빈 날짜를 자동으로 채운 뒤 바로 저장합니다. 날짜는 2026년 공휴일을 제외하며, 체온·수유량·식사/간식 횟수는 이전 실제 기록값이 있을 때만 그 값들 중에서 제안합니다. 기존 입력값·서명·기타서비스는 유지됩니다.';
 
     wrap.append(button, help);
     row.insertAdjacentElement('afterend', wrap);
