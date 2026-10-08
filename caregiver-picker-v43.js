@@ -1,6 +1,6 @@
 (() => {
-  if (window.__BESTMOM_CAREGIVER_PICKER_V43__) return;
-  window.__BESTMOM_CAREGIVER_PICKER_V43__ = true;
+  if (window.__BESTMOM_CAREGIVER_PICKER_V74__) return;
+  window.__BESTMOM_CAREGIVER_PICKER_V74__ = true;
 
   const CHOSEONG = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
   const consonantRe = /^[ㄱ-ㅎ]$/;
@@ -79,6 +79,11 @@
     const selected = document.createElement('div');
     selected.style.cssText = 'font-size:11px;color:#6b7280;margin-top:4px;min-height:16px;';
 
+    const manual = document.createElement('input');
+    manual.type = 'hidden';
+    manual.id = 'caseCgManual';
+    manual.value = '';
+
     const results = document.createElement('div');
     results.dataset.caregiverSearchResults = '1';
     results.style.cssText = 'display:none;position:absolute;z-index:5000;left:0;right:0;top:calc(100% - 17px);background:#fff;border:1px solid #d1d5db;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);max-height:260px;overflow:auto;padding:5px;';
@@ -95,7 +100,7 @@
 
       if (!matches.length) {
         const empty = document.createElement('div');
-        empty.textContent = '검색되는 관리사가 없습니다.';
+        empty.textContent = '등록된 관리사가 없습니다. 입력한 이름 그대로 저장할 수 있습니다.';
         empty.style.cssText = 'padding:10px;font-size:12px;color:#6b7280;';
         results.appendChild(empty);
       } else {
@@ -108,6 +113,7 @@
           button.onmouseleave = () => { button.style.background = '#fff'; };
           button.onclick = () => {
             select.value = item.value;
+            manual.value = '';
             select.dispatchEvent(new Event('change', { bubbles: true }));
             input.value = item.name;
             selected.textContent = `선택됨: ${item.name} 관리사`;
@@ -124,9 +130,18 @@
     input.addEventListener('input', () => {
       const typed = input.value.trim();
       const currentOption = [...select.options].find((option) => option.value === select.value);
-      if (!typed || (currentOption && typed !== currentOption.textContent.trim())) {
+
+      if (!typed) {
         select.value = '';
+        manual.value = '';
         selected.textContent = '';
+      } else if (currentOption && typed === currentOption.textContent.trim()) {
+        manual.value = '';
+        selected.textContent = `선택됨: ${currentOption.textContent.trim()} 관리사`;
+      } else {
+        select.value = '';
+        manual.value = typed;
+        selected.textContent = `미등록 이름으로 저장: ${typed}`;
       }
       showResults();
     });
@@ -141,7 +156,7 @@
       selected.textContent = `선택됨: ${current.textContent.trim()} 관리사`;
     }
 
-    box.append(input, selected, results);
+    box.append(input, manual, selected, results);
     select.insertAdjacentElement('beforebegin', box);
   }
 
