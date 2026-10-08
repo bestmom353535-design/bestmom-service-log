@@ -1,6 +1,6 @@
 (() => {
-  if (window.__BESTMOM_ADMIN_CASE_EDIT_V74__) return;
-  window.__BESTMOM_ADMIN_CASE_EDIT_V74__ = true;
+  if (window.__BESTMOM_ADMIN_CASE_EDIT_V83__) return;
+  window.__BESTMOM_ADMIN_CASE_EDIT_V83__ = true;
 
   const CHOSEONG = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
   const consonantRe = /^[ㄱ-ㅎ]$/;
@@ -332,7 +332,7 @@
     if (!mainEl) return;
 
     const card = [...mainEl.querySelectorAll('.card')].find(
-      (el) => el.querySelector('h3')?.textContent?.trim() === '서비스 현황'
+      (el) => el.querySelector('h3')?.textContent?.trim()?.startsWith('서비스 현황')
     );
     if (!card) return;
 
