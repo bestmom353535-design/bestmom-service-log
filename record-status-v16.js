@@ -1,4 +1,7 @@
 (() => {
+  if (window.__BESTMOM_RECORD_STATUS_V75__) return;
+  window.__BESTMOM_RECORD_STATUS_V75__ = true;
+
   const previousOpenCase = window.openCase;
   if (typeof previousOpenCase !== 'function') return;
 
@@ -15,13 +18,14 @@
     return `${month}/${day} (${weekday})`;
   }
 
-  window.openCase = async function openCaseWithRecordStatus(id, adminMode) {
-    await previousOpenCase(id, adminMode);
+  async function refreshRecordStatus(id) {
+    const caseId = id || (typeof currentCase !== 'undefined' ? currentCase?.id : null);
+    if (!caseId) return;
 
     const { data: records, error } = await sb
       .from('daily_records')
       .select('service_day,service_date,locked')
-      .eq('case_id', id)
+      .eq('case_id', caseId)
       .order('service_day');
 
     if (error) {
@@ -62,27 +66,37 @@
         button.style.borderColor = '#86efac';
         button.style.color = '#166534';
       } else {
-        button.innerHTML = `${day}일차<br><small style="font-size:11px;font-weight:800">${serviceDate} · 미서명</small>`;
-        button.style.background = '#fff7ed';
-        button.style.borderColor = '#f59e0b';
-        button.style.color = '#92400e';
+        button.innerHTML = `${day}일차<br><small style="font-size:11px;font-weight:800">${serviceDate} · 입력완료</small>`;
+        button.style.background = '#dbeafe';
+        button.style.borderColor = '#93c5fd';
+        button.style.color = '#1d4ed8';
       }
     });
 
     const buttonRow = buttons[0]?.parentElement;
-    if (!buttonRow || document.querySelector('[data-record-progress-summary]')) return;
+    if (!buttonRow) return;
 
-    const summary = document.createElement('div');
-    summary.dataset.recordProgressSummary = '1';
-    summary.style.cssText = 'margin:12px 0 10px;padding:11px 12px;border:1px solid #e5e7eb;border-radius:10px;background:#f8fafc;';
+    let summary = document.querySelector('[data-record-progress-summary]');
+    if (!summary) {
+      summary = document.createElement('div');
+      summary.dataset.recordProgressSummary = '1';
+      summary.style.cssText = 'margin:12px 0 10px;padding:11px 12px;border:1px solid #e5e7eb;border-radius:10px;background:#f8fafc;';
+      buttonRow.insertAdjacentElement('beforebegin', summary);
+    }
+
     summary.innerHTML = `
-      <div style="font-size:14px;font-weight:800;margin-bottom:7px">기록 작성 ${savedDays}/${totalDays}일 · 서명 완료 ${signedDays}/${totalDays}일</div>
+      <div style="font-size:14px;font-weight:800;margin-bottom:7px">기록 입력 완료 ${savedDays}/${totalDays}일 · 서명 완료 ${signedDays}/${totalDays}일</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;font-size:11px;font-weight:800">
         <span style="padding:4px 7px;border-radius:999px;background:#f3f4f6;color:#4b5563;border:1px solid #d1d5db">미작성</span>
-        <span style="padding:4px 7px;border-radius:999px;background:#fff7ed;color:#92400e;border:1px solid #f59e0b">날짜 · 미서명</span>
+        <span style="padding:4px 7px;border-radius:999px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd">날짜 · 입력완료</span>
         <span style="padding:4px 7px;border-radius:999px;background:#dcfce7;color:#166534;border:1px solid #86efac">날짜 · 서명완료 ✓</span>
       </div>`;
+  }
 
-    buttonRow.insertAdjacentElement('beforebegin', summary);
+  window.refreshRecordStatus = refreshRecordStatus;
+
+  window.openCase = async function openCaseWithRecordStatus(id, adminMode) {
+    await previousOpenCase(id, adminMode);
+    await refreshRecordStatus(id);
   };
 })();
