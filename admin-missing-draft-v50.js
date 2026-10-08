@@ -1,12 +1,12 @@
 (() => {
-  if (window.__BESTMOM_ADMIN_MISSING_DRAFT_V77__) return;
-  window.__BESTMOM_ADMIN_MISSING_DRAFT_V77__ = true;
+  if (window.__BESTMOM_ADMIN_MISSING_DRAFT_V78__) return;
+  window.__BESTMOM_ADMIN_MISSING_DRAFT_V78__ = true;
 
   const previousOpenDay = window.openDay;
   const previousOpenCase = window.openCase;
   if (typeof previousOpenDay !== 'function' || typeof previousOpenCase !== 'function') return;
 
-  const BULK_STORAGE_PREFIX = 'bestmom_bulk_record_drafts_v77_';
+  const BULK_STORAGE_PREFIX = 'bestmom_bulk_record_drafts_v78_';
 
   function isAdmin() {
     return typeof me !== 'undefined' && me?.role === 'admin';
@@ -53,7 +53,7 @@
     '2026-01-01',
     '2026-02-16', '2026-02-17', '2026-02-18',
     '2026-03-01', '2026-03-02',
-    '2026-05-01', '2026-05-05', '2026-05-24', '2026-05-25',
+    '2026-05-05', '2026-05-24', '2026-05-25',
     '2026-06-03', '2026-06-06',
     '2026-07-17',
     '2026-08-15', '2026-08-17',
