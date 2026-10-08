@@ -1,6 +1,6 @@
 (() => {
-  if (window.__BESTMOM_ADMIN_CASE_EDIT_V69__) return;
-  window.__BESTMOM_ADMIN_CASE_EDIT_V69__ = true;
+  if (window.__BESTMOM_ADMIN_CASE_EDIT_V74__) return;
+  window.__BESTMOM_ADMIN_CASE_EDIT_V74__ = true;
 
   const CHOSEONG = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
   const consonantRe = /^[ㄱ-ㅎ]$/;
@@ -71,6 +71,7 @@
 
       const caregiverList = (caregivers || []).filter((x) => x.active || x.id === serviceCase.caregiver_id);
       const currentCaregiver = caregiverList.find((x) => x.id === serviceCase.caregiver_id) || null;
+      const currentCaregiverName = currentCaregiver?.full_name || serviceCase.caregiver_name_override || '';
 
       removeModal();
       const overlay = document.createElement('div');
@@ -108,15 +109,19 @@
 
           <div class="mt" style="position:relative">
             <label>배정 관리사</label>
-            <input id="editCaregiverSearch" type="search" autocomplete="off" placeholder="관리사 이름 검색 (예: 황ㅅ, ㅎㅅㅇ)" value="${esc(currentCaregiver?.full_name || '')}">
+            <input id="editCaregiverSearch" type="search" autocomplete="off" placeholder="관리사 이름 검색 또는 미등록 이름 직접 입력" value="${esc(currentCaregiverName)}">
             <input id="editCaregiverId" type="hidden" value="${esc(serviceCase.caregiver_id || '')}">
-            <div id="editCaregiverSelected" class="muted tiny" style="margin-top:5px">${currentCaregiver ? `현재 배정: ${esc(currentCaregiver.full_name)} 관리사` : '현재 배정: 미지정'}</div>
+            <div id="editCaregiverSelected" class="muted tiny" style="margin-top:5px">${currentCaregiver
+              ? `현재 배정: ${esc(currentCaregiver.full_name)} 관리사`
+              : serviceCase.caregiver_name_override
+                ? `현재 입력: ${esc(serviceCase.caregiver_name_override)} (미등록)`
+                : '현재 배정: 미지정'}</div>
             <div id="editCaregiverResults" style="display:none;position:absolute;z-index:100001;left:0;right:0;top:76px;background:#fff;border:1px solid #d1d5db;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);max-height:230px;overflow:auto;padding:5px"></div>
             <button type="button" id="editCaregiverClear" class="secondary" style="margin-top:7px;width:auto;min-height:34px;padding:6px 10px;font-size:12px">관리사 미지정으로 변경</button>
           </div>
 
           <div class="notice mt" style="background:#f8fafc;border-color:#e5e7eb">
-            등록한 산모·아기 정보, 서비스 기간·시작일, 배정 관리사를 수정할 수 있습니다. 관리사를 변경하면 저장 즉시 새 관리사에게 해당 서비스가 표시되고 기존 관리사 화면에서는 빠집니다.
+            관리사 등록 전이라면 이름만 직접 입력해도 저장할 수 있습니다. 미등록 이름은 기록지에는 표시되지만 관리사 로그인과는 연결되지 않습니다. 등록된 관리사를 선택하면 해당 계정으로 배정됩니다.
           </div>
 
           <div class="row" style="justify-content:flex-end;margin-top:16px">
@@ -143,7 +148,7 @@
           const empty = document.createElement('div');
           empty.className = 'muted';
           empty.style.padding = '10px';
-          empty.textContent = '검색되는 관리사가 없습니다.';
+          empty.textContent = '등록된 관리사가 없습니다. 입력한 이름 그대로 저장할 수 있습니다.';
           results.appendChild(empty);
         } else {
           matches.forEach((cg) => {
@@ -164,10 +169,15 @@
       };
 
       search.addEventListener('input', () => {
+        const typed = search.value.trim();
         const current = caregiverList.find((x) => x.id === hiddenId.value);
-        if (!current || search.value.trim() !== current.full_name) {
+        if (current && typed === current.full_name) {
+          selected.textContent = `선택됨: ${current.full_name} 관리사`;
+        } else {
           hiddenId.value = '';
-          selected.textContent = '검색 후 관리사 이름을 눌러 선택해주세요.';
+          selected.textContent = typed
+            ? `미등록 이름으로 저장: ${typed}`
+            : '선택됨: 미지정';
         }
         showMatches();
       });
@@ -198,7 +208,10 @@
           birth_weight: document.getElementById('editBirthWeight').value || null,
           service_days: Number(document.getElementById('editServiceDays').value),
           start_date: document.getElementById('editStartDate').value || null,
-          caregiver_id: hiddenId.value || null
+          caregiver_id: hiddenId.value || null,
+          caregiver_name_override: hiddenId.value
+            ? null
+            : (search.value.trim() || null)
         };
 
         if (![5, 10, 15, 20].includes(payload.service_days)) {
@@ -223,14 +236,18 @@
 
         const oldCaregiverId = serviceCase.caregiver_id || null;
         const newCaregiverId = payload.caregiver_id || null;
-        const caregiverChanged = oldCaregiverId !== newCaregiverId;
         const newCaregiver = caregiverList.find((x) => x.id === newCaregiverId);
         const oldCaregiver = caregiverList.find((x) => x.id === oldCaregiverId);
+        const oldCaregiverName = oldCaregiver?.full_name || serviceCase.caregiver_name_override || '미지정';
+        const newCaregiverName = newCaregiver?.full_name || payload.caregiver_name_override || '미지정';
+        const caregiverChanged =
+          oldCaregiverId !== newCaregiverId ||
+          (serviceCase.caregiver_name_override || null) !== (payload.caregiver_name_override || null);
 
         const serviceDaysChanged = Number(serviceCase.service_days) !== payload.service_days;
         const startDateChanged = (serviceCase.start_date || null) !== payload.start_date;
         const changeLines = [];
-        if (caregiverChanged) changeLines.push(`관리사: ${oldCaregiver?.full_name || '미지정'} → ${newCaregiver?.full_name || '미지정'}`);
+        if (caregiverChanged) changeLines.push(`관리사: ${oldCaregiverName} → ${newCaregiverName}`);
         if (serviceDaysChanged) changeLines.push(`서비스 기간: ${serviceCase.service_days}일 → ${payload.service_days}일`);
         if (startDateChanged) changeLines.push(`시작일: ${serviceCase.start_date || '미입력'} → ${payload.start_date || '미입력'}`);
 
@@ -262,8 +279,10 @@
                   start_date_after: payload.start_date,
                   caregiver_id_before: oldCaregiverId,
                   caregiver_id_after: newCaregiverId,
-                  caregiver_name_before: oldCaregiver?.full_name || null,
-                  caregiver_name_after: newCaregiver?.full_name || null
+                  caregiver_name_before: oldCaregiverName === '미지정' ? null : oldCaregiverName,
+                  caregiver_name_after: newCaregiverName === '미지정' ? null : newCaregiverName,
+                  caregiver_name_override_before: serviceCase.caregiver_name_override || null,
+                  caregiver_name_override_after: payload.caregiver_name_override || null
                 }
               });
             }
