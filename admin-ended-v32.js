@@ -15,7 +15,7 @@
 
   function serviceCard() {
     return [...document.querySelectorAll('#main > .card')].find(
-      (card) => card.querySelector('h3')?.textContent?.trim() === '서비스 현황'
+      (card) => card.querySelector('h3')?.textContent?.trim()?.startsWith('서비스 현황')
     );
   }
 
