@@ -1,12 +1,12 @@
 (() => {
-  if (window.__BESTMOM_ADMIN_MISSING_DRAFT_V80__) return;
-  window.__BESTMOM_ADMIN_MISSING_DRAFT_V80__ = true;
+  if (window.__BESTMOM_ADMIN_MISSING_DRAFT_V81__) return;
+  window.__BESTMOM_ADMIN_MISSING_DRAFT_V81__ = true;
 
   const previousOpenDay = window.openDay;
   const previousOpenCase = window.openCase;
   if (typeof previousOpenDay !== 'function' || typeof previousOpenCase !== 'function') return;
 
-  const BULK_STORAGE_PREFIX = 'bestmom_bulk_record_drafts_v80_';
+  const BULK_STORAGE_PREFIX = 'bestmom_bulk_record_drafts_v81_';
 
   function isAdmin() {
     return typeof me !== 'undefined' && me?.role === 'admin';
@@ -53,8 +53,9 @@
     '2026-01-01',
     '2026-02-16', '2026-02-17', '2026-02-18',
     '2026-03-01', '2026-03-02',
-    '2026-05-05', '2026-05-24', '2026-05-25',
+    '2026-05-01', '2026-05-05', '2026-05-24', '2026-05-25',
     '2026-06-03', '2026-06-06',
+    '2026-07-17',
     '2026-08-15', '2026-08-17',
     '2026-09-24', '2026-09-25', '2026-09-26',
     '2026-10-03', '2026-10-05', '2026-10-09',
@@ -324,18 +325,27 @@
   function buildFromPrevious(records, usedNotes = null, motherName = '', firstRecord = null) {
     const recent = records.slice(0, 5);
     const baseline = firstRecord || recent[recent.length - 1] || recent[0] || {};
-    const breastBase = filledNumber(baseline.breastfeed_count)
-      ? Number(baseline.breastfeed_count)
-      : Number(pickActual(recent, 'breastfeed_count') || 0);
-    const formulaBase = filledNumber(baseline.formula_count)
-      ? Number(baseline.formula_count)
-      : Number(pickActual(recent, 'formula_count') || 0);
+    const breastPicked = filledNumber(baseline.breastfeed_count)
+      ? baseline.breastfeed_count
+      : pickActual(recent, 'breastfeed_count');
+    const formulaPicked = filledNumber(baseline.formula_count)
+      ? baseline.formula_count
+      : pickActual(recent, 'formula_count');
 
-    const breastActive = breastBase > 0;
-    const formulaActive = formulaBase > 0;
+    const breastBase = breastPicked === null || breastPicked === undefined || breastPicked === ''
+      ? null
+      : Number(breastPicked);
+    const formulaBase = formulaPicked === null || formulaPicked === undefined || formulaPicked === ''
+      ? null
+      : Number(formulaPicked);
 
-    let breastfeedCount = breastActive ? varyCount(breastBase, 1, 20, 1) : 0;
-    let formulaCount = formulaActive ? varyCount(formulaBase, 1, 20, 1) : 0;
+    const breastKnown = Number.isFinite(breastBase);
+    const formulaKnown = Number.isFinite(formulaBase);
+    const breastActive = breastKnown && breastBase > 0;
+    const formulaActive = formulaKnown && formulaBase > 0;
+
+    let breastfeedCount = breastKnown ? (breastActive ? varyCount(breastBase, 1, 20, 1) : 0) : null;
+    let formulaCount = formulaKnown ? (formulaActive ? varyCount(formulaBase, 1, 20, 1) : 0) : null;
 
     // 1일차의 수유 형태(모유/분유/혼합)는 유지하고 횟수와 양만 조금씩 달라지게 한다.
     if (breastActive && !formulaActive) formulaCount = 0;
@@ -375,22 +385,10 @@
   }
 
   function firstDayReady(record) {
-    if (!record?.id || !record?.service_date) return false;
-    if (!filledArray(record.incision_status)) return false;
-    if (!filledArray(record.breast_status)) return false;
-    if (!filledArray(record.urination_bowel_status)) return false;
-    if (!filledText(record.sitz_bath)) return false;
-    if (!filledNumber(record.meal_count)) return false;
-    if (!filledNumber(record.snack_count)) return false;
-    if (!filledNumber(record.baby_temp)) return false;
-    if (!filledText(record.sleep_status)) return false;
-    if (!filledNumber(record.breastfeed_count)) return false;
-    if (!filledNumber(record.formula_count)) return false;
-    if (Number(record.formula_count) > 0 && !filledNumber(record.formula_ml)) return false;
-    if (!filledText(record.stool_status)) return false;
-    if (!filledText(record.bath_cord_status)) return false;
-    if (!filledText(record.notes)) return false;
-    return true;
+    // 1일차가 실제 DB에 저장되어 있고 날짜만 있으면 기준 기록으로 인정한다.
+    // 모유/분유 중 사용하지 않는 항목이나 간식 등 일부 칸이 비어 있어도
+    // 전체 자동채우기 자체를 막지 않는다.
+    return Boolean(record?.id && record?.service_date);
   }
 
   function setGroup(name, wanted) {
@@ -485,7 +483,7 @@
       const firstRecord = byDay.get(1);
 
       if (!firstDayReady(firstRecord)) {
-        alertMsg('전체 자동채우기를 하려면 먼저 1일차를 직접 모두 입력하고 저장해주세요. 1일차 서비스 날짜·수유·체온·식사/간식·특이사항 등이 기준이 됩니다.');
+        alertMsg('전체 자동채우기를 하려면 먼저 1일차 기록을 저장해주세요. 입력된 1일차 내용을 기준으로 나머지 일차의 빈칸을 만듭니다.');
         return;
       }
 
@@ -589,7 +587,7 @@
     const help = document.createElement('div');
     help.className = 'muted tiny';
     help.style.marginTop = '6px';
-    help.textContent = '1일차를 직접 입력·저장한 뒤 사용합니다. 수유방법·수유량·체온·식사/간식·특이사항 말투를 1일차 기준으로 조금씩 다르게 초안 제안하며, 날짜는 주말·2026년 공휴일을 제외합니다.';
+    help.textContent = '1일차를 저장한 뒤 사용합니다. 수유방법·수유량·체온·식사/간식·특이사항 말투를 1일차 기준으로 조금씩 다르게 초안 제안하며, 날짜는 주말·2026년 공휴일을 제외합니다.';
 
     wrap.append(button, help);
     row.insertAdjacentElement('afterend', wrap);
@@ -628,7 +626,7 @@
         .maybeSingle();
       if (firstError) throw firstError;
       if (!firstDayReady(firstRecord)) {
-        alertMsg('먼저 1일차를 직접 모두 입력하고 저장해주세요.');
+        alertMsg('먼저 1일차 기록을 저장해주세요.');
         return;
       }
 
