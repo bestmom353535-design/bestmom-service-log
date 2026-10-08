@@ -212,7 +212,7 @@ async function adminCases() {
         ${(cases || []).length ? (cases || []).map((c) => `
           <div class="case">
             <div class="row space">
-              <div><b>${escapeHtml(c.mother_name)}</b><div class="muted">아기 ${escapeHtml(c.baby_name || '')} · 관리사 ${escapeHtml(c.caregiver?.full_name || '미지정')} · ${c.service_days}일</div></div>
+              <div><b>${escapeHtml(c.mother_name)}</b><div class="muted">아기 ${escapeHtml(c.baby_name || '')} · 관리사 ${escapeHtml(c.caregiver?.full_name || c.caregiver_name_override || '미지정')} · ${c.service_days}일</div></div>
               <b>${counts[c.id] || 0}/${c.service_days}</b>
             </div>
             <div class="row mt">
@@ -232,6 +232,9 @@ async function adminCases() {
         baby_birth_date: $('bBirth').value || null,
         birth_weight: $('weight').value || null,
         caregiver_id: $('caseCg').value || null,
+        caregiver_name_override: $('caseCg').value
+          ? null
+          : (document.getElementById('caseCgManual')?.value.trim() || null),
         service_days: Number($('days').value),
         start_date: $('start').value || null,
         status: 'active'
