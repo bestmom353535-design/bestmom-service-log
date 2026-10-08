@@ -344,7 +344,7 @@
             <div class="row space">
               <div>
                 <b>${escapeHtml(c.mother_name)}</b>
-                <div class="muted">아기 ${escapeHtml(c.baby_name || '')} · 관리사 ${escapeHtml(c.caregiver?.full_name || '미지정')} · ${c.service_days}일</div>
+                <div class="muted">아기 ${escapeHtml(c.baby_name || '')} · 관리사 ${escapeHtml(c.caregiver?.full_name || c.caregiver_name_override || '미지정')} · ${c.service_days}일</div>
                 <div class="muted tiny" style="margin-top:4px">시작일 ${escapeHtml(dateLabel(c.start_date))} · 종료 처리일 ${escapeHtml(dateLabel(c.completed_at))}</div>
               </div>
               <div style="text-align:right;white-space:nowrap">
