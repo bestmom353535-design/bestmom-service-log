@@ -1,12 +1,12 @@
 (() => {
-  if (window.__BESTMOM_ADMIN_MISSING_DRAFT_V75__) return;
-  window.__BESTMOM_ADMIN_MISSING_DRAFT_V75__ = true;
+  if (window.__BESTMOM_ADMIN_MISSING_DRAFT_V77__) return;
+  window.__BESTMOM_ADMIN_MISSING_DRAFT_V77__ = true;
 
   const previousOpenDay = window.openDay;
   const previousOpenCase = window.openCase;
   if (typeof previousOpenDay !== 'function' || typeof previousOpenCase !== 'function') return;
 
-  const BULK_STORAGE_PREFIX = 'bestmom_bulk_record_drafts_v75_';
+  const BULK_STORAGE_PREFIX = 'bestmom_bulk_record_drafts_v77_';
 
   function isAdmin() {
     return typeof me !== 'undefined' && me?.role === 'admin';
@@ -49,21 +49,37 @@
     return `${y}-${m}-${d}`;
   }
 
-  function isWeekday(date) {
+  const KOREA_PUBLIC_HOLIDAYS_2026 = new Set([
+    '2026-01-01',
+    '2026-02-16', '2026-02-17', '2026-02-18',
+    '2026-03-01', '2026-03-02',
+    '2026-05-01', '2026-05-05', '2026-05-24', '2026-05-25',
+    '2026-06-03', '2026-06-06',
+    '2026-07-17',
+    '2026-08-15', '2026-08-17',
+    '2026-09-24', '2026-09-25', '2026-09-26',
+    '2026-10-03', '2026-10-05', '2026-10-09',
+    '2026-12-25'
+  ]);
+
+  function isServiceWorkday(date) {
     const day = date.getDay();
-    return day !== 0 && day !== 6;
+    if (day === 0 || day === 6) return false;
+    const key = formatLocalDate(date);
+    if (date.getFullYear() === 2026 && KOREA_PUBLIC_HOLIDAYS_2026.has(key)) return false;
+    return true;
   }
 
   function weekdayDateForServiceDay(startDate, serviceDay) {
     const date = parseLocalDate(startDate);
     if (!date || !Number.isFinite(Number(serviceDay)) || Number(serviceDay) < 1) return '';
 
-    while (!isWeekday(date)) date.setDate(date.getDate() + 1);
+    while (!isServiceWorkday(date)) date.setDate(date.getDate() + 1);
 
     let count = 1;
     while (count < Number(serviceDay)) {
       date.setDate(date.getDate() + 1);
-      if (isWeekday(date)) count += 1;
+      if (isServiceWorkday(date)) count += 1;
     }
     return formatLocalDate(date);
   }
@@ -167,30 +183,83 @@
     return mode(normalized, fallback);
   }
 
-  const NOTE_VARIATIONS = [
-    '아기 잘 먹고 잘 잠',
-    '수유 후 잘 잠',
-    '트림 잘 하고 편안해 보였음',
-    '기저귀 갈고 잘 쉬었음',
-    '분유 먹고 편안히 잠',
-    '배변 괜찮고 잘 먹었음',
-    '수유하고 트림 잘 했음',
-    '잘 먹고 편안히 지냈음',
-    '낮잠 잘 자고 수유 잘 했음',
-    '기저귀 갈고 수유 잘 했음',
-    '아기 컨디션 좋아 보였음',
-    '수유 후 편안히 쉬었음',
-    '잠 잘 자고 잘 먹었음',
-    '배변 상태 괜찮았음',
-    '수유 후 트림 잘 했음',
-    '잘 먹고 잘 자는 편이었음',
-    '아기 편안하게 잘 있었음',
-    '분유 잘 먹고 잘 쉬었음',
-    '수유와 기저귀 교환 잘 했음',
-    '특별한 불편 없이 잘 지냈음'
-  ];
+  const NOTE_VARIATIONS = {
+    memo: [
+      '아기 잘 먹고 잘 잤음',
+      '수유 후 편안히 잘 잤음',
+      '트림 잘 하고 편안해 보였음',
+      '기저귀 갈고 잘 쉬었음',
+      '분유 잘 먹고 편안히 잤음',
+      '배변 괜찮고 잘 먹었음',
+      '수유하고 트림 잘 했음',
+      '잘 먹고 편안히 지냈음',
+      '낮잠 잘 자고 수유 잘 했음',
+      '기저귀 갈고 수유 잘 했음',
+      '아기 컨디션 좋아 보였음',
+      '수유 후 편안히 쉬었음',
+      '잠 잘 자고 잘 먹었음',
+      '배변 상태 괜찮았음',
+      '수유 후 트림 잘 했음',
+      '잘 먹고 잘 자는 편이었음',
+      '아기 편안하게 잘 있었음',
+      '분유 잘 먹고 잘 쉬었음',
+      '수유와 기저귀 교환 잘 했음',
+      '특별한 불편 없이 잘 지냈음'
+    ],
+    polite: [
+      '아기 잘 먹고 잘 잤습니다',
+      '수유 후 편안히 잘 잤습니다',
+      '트림 잘 하고 편안해 보였습니다',
+      '기저귀 갈고 잘 쉬었습니다',
+      '분유 잘 먹고 편안히 잤습니다',
+      '배변 괜찮고 잘 먹었습니다',
+      '수유하고 트림 잘 했습니다',
+      '잘 먹고 편안히 지냈습니다',
+      '낮잠 잘 자고 수유 잘 했습니다',
+      '기저귀 갈고 수유 잘 했습니다',
+      '아기 컨디션 좋아 보였습니다',
+      '수유 후 편안히 쉬었습니다',
+      '잠 잘 자고 잘 먹었습니다',
+      '배변 상태 괜찮았습니다',
+      '수유 후 트림 잘 했습니다',
+      '잘 먹고 잘 자는 편이었습니다',
+      '아기 편안하게 잘 있었습니다',
+      '분유 잘 먹고 잘 쉬었습니다',
+      '수유와 기저귀 교환 잘 했습니다',
+      '특별한 불편 없이 잘 지냈습니다'
+    ],
+    plain: [
+      '아기 잘 먹고 잘 잤다',
+      '수유 후 편안히 잘 잤다',
+      '트림 잘 하고 편안해 보였다',
+      '기저귀 갈고 잘 쉬었다',
+      '분유 잘 먹고 편안히 잤다',
+      '배변 괜찮고 잘 먹었다',
+      '수유하고 트림 잘 했다',
+      '잘 먹고 편안히 지냈다',
+      '낮잠 잘 자고 수유 잘 했다',
+      '기저귀 갈고 수유 잘 했다',
+      '아기 컨디션 좋아 보였다',
+      '수유 후 편안히 쉬었다',
+      '잠 잘 자고 잘 먹었다',
+      '배변 상태 괜찮았다',
+      '수유 후 트림 잘 했다',
+      '잘 먹고 잘 자는 편이었다',
+      '아기 편안하게 잘 있었다',
+      '분유 잘 먹고 잘 쉬었다',
+      '수유와 기저귀 교환 잘 했다',
+      '특별한 불편 없이 잘 지냈다'
+    ]
+  };
 
-  function variedNote(records = [], usedNotes = null) {
+  function noteStyleForMother(motherName) {
+    const text = String(motherName || '').trim() || '산모';
+    let hash = 0;
+    for (const ch of text) hash = ((hash * 31) + ch.charCodeAt(0)) >>> 0;
+    return ['memo', 'polite', 'plain'][hash % 3];
+  }
+
+  function variedNote(records = [], usedNotes = null, motherName = '') {
     const used = new Set(
       (records || [])
         .map((r) => String(r?.notes || '').trim())
@@ -200,12 +269,14 @@
       [...usedNotes].forEach((note) => used.add(String(note || '').trim()));
     }
 
-    const available = NOTE_VARIATIONS.filter((note) => !used.has(note));
-    const pool = available.length ? available : NOTE_VARIATIONS;
+    const style = noteStyleForMother(motherName);
+    const stylePool = NOTE_VARIATIONS[style] || NOTE_VARIATIONS.memo;
+    const available = stylePool.filter((note) => !used.has(note));
+    const pool = available.length ? available : stylePool;
     return pool[Math.floor(Math.random() * pool.length)];
   }
 
-  function buildFromPrevious(records, usedNotes = null) {
+  function buildFromPrevious(records, usedNotes = null, motherName = '') {
     const recent = records.slice(0, 5);
     const latest = recent[0] || {};
     const formulaCount = median(recent.map((r) => r.formula_count)) ?? 2;
@@ -223,12 +294,12 @@
       formula_ml: formulaCount === 0 ? null : (median(recent.map((r) => r.formula_ml)) ?? 70),
       stool_status: mode(recent.map((r) => r.stool_status), '정상변'),
       bath_cord_status: mode(recent.map((r) => r.bath_cord_status), '실시'),
-      notes: variedNote(recent, usedNotes)
+      notes: variedNote(recent, usedNotes, motherName)
     };
     return result;
   }
 
-  function buildGenericThreeWeekDraft(usedNotes = null) {
+  function buildGenericThreeWeekDraft(usedNotes = null, motherName = '') {
     return {
       incision_status: ['이상없음'],
       breast_status: ['이상없음'],
@@ -243,7 +314,7 @@
       formula_ml: 70,
       stool_status: '정상변',
       bath_cord_status: '실시',
-      notes: variedNote([], usedNotes)
+      notes: variedNote([], usedNotes, motherName)
     };
   }
 
@@ -312,7 +383,7 @@
     const ok = window.confirm(
       '전체 일차의 빈칸을 자동으로 채우고 바로 저장하시겠습니까?\n\n' +
       '기존 입력값·산모 서명·기타서비스는 건드리지 않습니다.\n' +
-      '빈 서비스 날짜는 시작일 기준 평일(월~금) 순서로 자동 입력합니다.\n' +
+      '빈 서비스 날짜는 시작일 기준으로 주말과 2026년 공휴일을 제외해 자동 입력합니다.\n' +
       '저장 후 각 일차를 열어 바로 산모 서명을 입력하거나 수정할 수 있습니다.'
     );
     if (!ok) return;
@@ -334,7 +405,7 @@
       if (!serviceMeta?.service_days || !serviceMeta?.start_date) {
         const { data: serviceCase, error: caseError } = await sb
           .from('service_cases')
-          .select('service_days,start_date')
+          .select('service_days,start_date,mother_name')
           .eq('id', caseId)
           .single();
         if (caseError) throw caseError;
@@ -367,8 +438,8 @@
 
         const hasPrevious = previous.length > 0;
         const generatedDraft = hasPrevious
-          ? buildFromPrevious(previous, usedAutoNotes)
-          : buildGenericThreeWeekDraft(usedAutoNotes);
+          ? buildFromPrevious(previous, usedAutoNotes, serviceMeta?.mother_name || '')
+          : buildGenericThreeWeekDraft(usedAutoNotes, serviceMeta?.mother_name || '');
         if (generatedDraft.notes) usedAutoNotes.add(generatedDraft.notes);
 
         const serviceDate = row?.service_date || weekdayDateForServiceDay(startDate, day);
@@ -409,7 +480,7 @@
           details: {
             saved_service_days: savedDays,
             auto_date_start: startDate,
-            auto_date_rule: 'weekdays_mon_fri',
+            auto_date_rule: 'weekdays_excluding_2026_korean_public_holidays',
             count: savedDays.length
           }
         });
@@ -499,7 +570,7 @@
       if (error) throw error;
 
       const hasPrevious = (previous || []).length > 0;
-      const draft = hasPrevious ? buildFromPrevious(previous) : buildGenericThreeWeekDraft();
+      const draft = hasPrevious ? buildFromPrevious(previous, null, currentCase?.mother_name || '') : buildGenericThreeWeekDraft(null, currentCase?.mother_name || '');
       applyDraft(draft);
 
       addDraftNotice(
