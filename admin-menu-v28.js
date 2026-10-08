@@ -13,7 +13,7 @@
 
   function findCard(title) {
     return [...document.querySelectorAll('#main > .card')].find(
-      (card) => card.querySelector('h3')?.textContent?.trim() === title
+      (card) => card.querySelector('h3')?.textContent?.trim()?.startsWith(title)
     );
   }
 
