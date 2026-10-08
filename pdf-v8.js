@@ -375,7 +375,7 @@
     centerText(ctx, caseData.baby_name, headerRects.baby_name, 10.5);
     centerText(ctx, fmtDate(caseData.baby_birth_date), headerRects.baby_birth, 10.5);
     centerText(ctx, caseData.birth_weight ?? '', headerRects.birth_weight, 10.5);
-    centerText(ctx, caseData.caregiver?.full_name || '', headerRects.worker, 10.5);
+    centerText(ctx, caseData.caregiver?.full_name || caseData.caregiver_name_override || '', headerRects.worker, 10.5);
 
     const pageRecords = (records || []).filter((r) => Math.floor((Number(r.service_day) - 1) / 5) === pageIndex);
     for (const r of pageRecords) {
