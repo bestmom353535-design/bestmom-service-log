@@ -1,12 +1,12 @@
 (() => {
-  if (window.__BESTMOM_ADMIN_MISSING_DRAFT_V66__) return;
-  window.__BESTMOM_ADMIN_MISSING_DRAFT_V66__ = true;
+  if (window.__BESTMOM_ADMIN_MISSING_DRAFT_V73__) return;
+  window.__BESTMOM_ADMIN_MISSING_DRAFT_V73__ = true;
 
   const previousOpenDay = window.openDay;
   const previousOpenCase = window.openCase;
   if (typeof previousOpenDay !== 'function' || typeof previousOpenCase !== 'function') return;
 
-  const BULK_STORAGE_PREFIX = 'bestmom_bulk_record_drafts_v56_';
+  const BULK_STORAGE_PREFIX = 'bestmom_bulk_record_drafts_v73_';
 
   function isAdmin() {
     return typeof me !== 'undefined' && me?.role === 'admin';
@@ -34,6 +34,40 @@
     }
   }
 
+  function parseLocalDate(value) {
+    const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return null;
+    const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12, 0, 0, 0);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  function formatLocalDate(date) {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  function isWeekday(date) {
+    const day = date.getDay();
+    return day !== 0 && day !== 6;
+  }
+
+  function weekdayDateForServiceDay(startDate, serviceDay) {
+    const date = parseLocalDate(startDate);
+    if (!date || !Number.isFinite(Number(serviceDay)) || Number(serviceDay) < 1) return '';
+
+    while (!isWeekday(date)) date.setDate(date.getDate() + 1);
+
+    let count = 1;
+    while (count < Number(serviceDay)) {
+      date.setDate(date.getDate() + 1);
+      if (isWeekday(date)) count += 1;
+    }
+    return formatLocalDate(date);
+  }
+
   function recordNeedsDraft(row) {
     if (!row) return true;
     if (row.locked) return false;
@@ -42,6 +76,7 @@
     const missingText = (value) => !String(value || '').trim();
     const missingNumber = (value) => value === null || value === undefined || value === '';
 
+    if (missingText(row.service_date)) return true;
     if (missingArray(row.incision_status)) return true;
     if (missingArray(row.breast_status)) return true;
     if (missingArray(row.urination_bowel_status)) return true;
@@ -215,7 +250,7 @@
     notice.dataset.adminAutoDraftNotice = '1';
     notice.className = 'notice mt';
     notice.style.cssText += ';background:#eff6ff;border-color:#93c5fd;color:#1e3a8a;font-weight:700;';
-    notice.innerHTML = `자동 초안 적용됨 · ${basisText}<br><span style="font-weight:500">서비스 날짜는 직접 입력하고, 저장 전 실제 제공내용과 맞는지 확인해주세요.</span>`;
+    notice.innerHTML = `자동 초안 적용됨 · ${basisText}<br><span style="font-weight:500">저장 전 날짜와 실제 제공내용이 맞는지 확인해주세요.</span>`;
     const save = document.getElementById('save');
     if (save) save.insertAdjacentElement('beforebegin', notice);
   }
@@ -238,7 +273,8 @@
     if (!isAdmin()) return;
     const ok = window.confirm(
       '전체 일차의 비어 있는 항목에 자동 초안을 준비하시겠습니까?\n\n' +
-      '기존 입력값·서비스 날짜·산모 서명·기타서비스는 건드리지 않습니다.\n' +
+      '기존 입력값·산모 서명·기타서비스는 건드리지 않습니다.\n' +
+      '빈 서비스 날짜는 시작일 기준 평일(월~금) 순서로 자동 입력합니다.\n' +
       '각 일차를 열어 내용을 확인한 뒤 직접 저장해주세요.'
     );
     if (!ok) return;
@@ -247,25 +283,28 @@
     try {
       const { data: rows, error } = await sb
         .from('daily_records')
-        .select('service_day,locked,incision_status,breast_status,urination_bowel_status,sitz_bath,meal_count,snack_count,baby_temp,sleep_status,breastfeed_count,formula_count,formula_ml,stool_status,bath_cord_status,other_service,notes')
+        .select('service_day,service_date,locked,incision_status,breast_status,urination_bowel_status,sitz_bath,meal_count,snack_count,baby_temp,sleep_status,breastfeed_count,formula_count,formula_ml,stool_status,bath_cord_status,other_service,notes')
         .eq('case_id', caseId)
         .order('service_day');
       if (error) throw error;
 
-      let totalDays = Number(
+      let serviceMeta =
         typeof currentCase !== 'undefined' && currentCase?.id === caseId
-          ? currentCase.service_days
-          : 0
-      );
-      if (!totalDays) {
+          ? currentCase
+          : null;
+
+      if (!serviceMeta?.service_days || !serviceMeta?.start_date) {
         const { data: serviceCase, error: caseError } = await sb
           .from('service_cases')
-          .select('service_days')
+          .select('service_days,start_date')
           .eq('id', caseId)
           .single();
         if (caseError) throw caseError;
-        totalDays = Number(serviceCase?.service_days || 0);
+        serviceMeta = { ...(serviceMeta || {}), ...(serviceCase || {}) };
       }
+
+      const totalDays = Number(serviceMeta?.service_days || 0);
+      const startDate = serviceMeta?.start_date || null;
 
       const actual = rows || [];
       const byDay = new Map(actual.map((row) => [Number(row.service_day), row]));
@@ -291,6 +330,7 @@
 
         drafts[day] = {
           draft: generatedDraft,
+          service_date: row?.service_date || weekdayDateForServiceDay(startDate, day) || null,
           basis: hasPrevious ? 'previous_records' : 'generic_three_week_draft',
           reference_service_days: hasPrevious ? previous.map((item) => Number(item.service_day)) : [],
           prepared_at: new Date().toISOString()
@@ -309,6 +349,8 @@
           action: 'admin_bulk_missing_record_drafts_prepared',
           details: {
             prepared_service_days: Object.keys(drafts).map(Number),
+            auto_date_start: startDate,
+            auto_date_rule: 'weekdays_mon_fri',
             count: Object.keys(drafts).length
           }
         });
@@ -318,7 +360,7 @@
 
       alertMsg(
         Object.keys(drafts).length
-          ? `총 ${Object.keys(drafts).length}개 일차의 빈칸 초안을 준비했습니다.\n\n각 일차를 열면 자동으로 채워져 보이며, 확인 후 저장해주세요.`
+          ? `총 ${Object.keys(drafts).length}개 일차의 빈칸 초안을 준비했습니다.\n\n빈 날짜도 시작일 기준 평일 순서로 함께 채워집니다. 각 일차를 열어 확인 후 저장해주세요.`
           : '현재 자동으로 채울 빈칸이 없습니다.'
       );
     } catch (error) {
@@ -350,7 +392,7 @@
     const help = document.createElement('div');
     help.className = 'muted tiny';
     help.style.marginTop = '6px';
-    help.textContent = '전체 일차의 비어 있는 항목만 초안으로 준비합니다. 기존 입력값·서비스 날짜·서명·기타서비스는 유지되며, 실제 저장은 각 일차에서 확인 후 진행합니다.';
+    help.textContent = '전체 일차의 비어 있는 항목을 초안으로 준비하고, 빈 서비스 날짜는 시작일 기준 평일 순서로 채웁니다. 기존 입력값·서명·기타서비스는 유지됩니다.';
 
     wrap.append(button, help);
     row.insertAdjacentElement('afterend', wrap);
@@ -366,7 +408,14 @@
 
     applyDraft(prepared.draft);
     const date = document.getElementById('serviceDate');
-    if (!currentRecord?.id && date) date.value = '';
+    if (date && !date.disabled) {
+      const savedDate = String(currentRecord?.service_date || '').trim();
+      if (!savedDate && prepared.service_date) {
+        date.value = prepared.service_date;
+        date.dispatchEvent(new Event('input', { bubbles: true }));
+        date.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
 
     addDraftNotice(
       prepared.basis === 'previous_records'
@@ -390,9 +439,6 @@
       const hasPrevious = (previous || []).length > 0;
       const draft = hasPrevious ? buildFromPrevious(previous) : buildGenericThreeWeekDraft();
       applyDraft(draft);
-
-      const date = document.getElementById('serviceDate');
-      if (!currentRecord?.id && date) date.value = '';
 
       addDraftNotice(
         hasPrevious
