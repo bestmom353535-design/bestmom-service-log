@@ -1,12 +1,12 @@
 (() => {
-  if (window.__BESTMOM_ADMIN_MISSING_DRAFT_V79__) return;
-  window.__BESTMOM_ADMIN_MISSING_DRAFT_V79__ = true;
+  if (window.__BESTMOM_ADMIN_MISSING_DRAFT_V80__) return;
+  window.__BESTMOM_ADMIN_MISSING_DRAFT_V80__ = true;
 
   const previousOpenDay = window.openDay;
   const previousOpenCase = window.openCase;
   if (typeof previousOpenDay !== 'function' || typeof previousOpenCase !== 'function') return;
 
-  const BULK_STORAGE_PREFIX = 'bestmom_bulk_record_drafts_v79_';
+  const BULK_STORAGE_PREFIX = 'bestmom_bulk_record_drafts_v80_';
 
   function isAdmin() {
     return typeof me !== 'undefined' && me?.role === 'admin';
@@ -53,9 +53,8 @@
     '2026-01-01',
     '2026-02-16', '2026-02-17', '2026-02-18',
     '2026-03-01', '2026-03-02',
-    '2026-05-01', '2026-05-05', '2026-05-24', '2026-05-25',
+    '2026-05-05', '2026-05-24', '2026-05-25',
     '2026-06-03', '2026-06-06',
-    '2026-07-17',
     '2026-08-15', '2026-08-17',
     '2026-09-24', '2026-09-25', '2026-09-26',
     '2026-10-03', '2026-10-05', '2026-10-09',
@@ -70,11 +69,10 @@
     return true;
   }
 
-  function weekdayDateForServiceDay(startDate, serviceDay) {
-    const date = parseLocalDate(startDate);
+  function serviceDateFromFirst(firstServiceDate, serviceDay) {
+    const date = parseLocalDate(firstServiceDate);
     if (!date || !Number.isFinite(Number(serviceDay)) || Number(serviceDay) < 1) return '';
-
-    while (!isServiceWorkday(date)) date.setDate(date.getDate() + 1);
+    if (Number(serviceDay) === 1) return formatLocalDate(date);
 
     let count = 1;
     while (count < Number(serviceDay)) {
@@ -191,6 +189,45 @@
     return available[Math.floor(Math.random() * available.length)];
   }
 
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function randomInt(min, max) {
+    const lo = Math.ceil(min);
+    const hi = Math.floor(max);
+    return Math.floor(Math.random() * (hi - lo + 1)) + lo;
+  }
+
+  function varyCount(base, min = 0, max = 20, spread = 1) {
+    if (base === null || base === undefined || base === '') return null;
+    const n = Number(base);
+    if (!Number.isFinite(n)) return null;
+    return clamp(Math.round(n + randomInt(-spread, spread)), min, max);
+  }
+
+  function varyTemp(base) {
+    const n = Number(base);
+    if (!Number.isFinite(n)) return null;
+    const deltas = [-0.2, -0.1, 0, 0.1, 0.2];
+    return Math.round(clamp(n + deltas[randomInt(0, deltas.length - 1)], 35.8, 37.4) * 10) / 10;
+  }
+
+  function varyMl(base) {
+    const n = Number(base);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    const deltas = [-10, 0, 10];
+    return Math.max(10, Math.round((n + deltas[randomInt(0, deltas.length - 1)]) / 10) * 10);
+  }
+
+  function noteStyleFromFirst(firstNote, motherName = '') {
+    const text = String(firstNote || '').trim();
+    if (/습니다$|했습니다$|였습니다$|보였습니다$/.test(text)) return 'polite';
+    if (/다$|했다$|였다$|보였다$/.test(text)) return 'plain';
+    if (text) return 'memo';
+    return noteStyleForMother(motherName);
+  }
+
   const NOTE_VARIATIONS = {
     memo: [
       '아기 잘 먹고 잘 잤음',
@@ -267,7 +304,7 @@
     return ['memo', 'polite', 'plain'][hash % 3];
   }
 
-  function variedNote(records = [], usedNotes = null, motherName = '') {
+  function variedNote(records = [], usedNotes = null, motherName = '', forcedStyle = null) {
     const used = new Set(
       (records || [])
         .map((r) => String(r?.notes || '').trim())
@@ -277,52 +314,83 @@
       [...usedNotes].forEach((note) => used.add(String(note || '').trim()));
     }
 
-    const style = noteStyleForMother(motherName);
+    const style = forcedStyle || noteStyleForMother(motherName);
     const stylePool = NOTE_VARIATIONS[style] || NOTE_VARIATIONS.memo;
     const available = stylePool.filter((note) => !used.has(note));
     const pool = available.length ? available : stylePool;
     return pool[Math.floor(Math.random() * pool.length)];
   }
 
-  function buildFromPrevious(records, usedNotes = null, motherName = '') {
+  function buildFromPrevious(records, usedNotes = null, motherName = '', firstRecord = null) {
     const recent = records.slice(0, 5);
-    const formulaCount = pickActual(recent, 'formula_count');
-    const result = {
-      incision_status: modeArray(recent.map((r) => r.incision_status), ['이상없음']),
-      breast_status: modeArray(recent.map((r) => r.breast_status), ['이상없음']),
-      urination_bowel_status: modeArray(recent.map((r) => r.urination_bowel_status), ['이상없음']),
-      sitz_bath: mode(recent.map((r) => r.sitz_bath), '미실시'),
-      meal_count: pickActual(recent, 'meal_count'),
-      snack_count: pickActual(recent, 'snack_count'),
-      baby_temp: pickActual(recent, 'baby_temp'),
-      sleep_status: mode(recent.map((r) => r.sleep_status), '잘잠'),
-      breastfeed_count: pickActual(recent, 'breastfeed_count'),
+    const baseline = firstRecord || recent[recent.length - 1] || recent[0] || {};
+    const breastBase = filledNumber(baseline.breastfeed_count)
+      ? Number(baseline.breastfeed_count)
+      : Number(pickActual(recent, 'breastfeed_count') || 0);
+    const formulaBase = filledNumber(baseline.formula_count)
+      ? Number(baseline.formula_count)
+      : Number(pickActual(recent, 'formula_count') || 0);
+
+    const breastActive = breastBase > 0;
+    const formulaActive = formulaBase > 0;
+
+    let breastfeedCount = breastActive ? varyCount(breastBase, 1, 20, 1) : 0;
+    let formulaCount = formulaActive ? varyCount(formulaBase, 1, 20, 1) : 0;
+
+    // 1일차의 수유 형태(모유/분유/혼합)는 유지하고 횟수와 양만 조금씩 달라지게 한다.
+    if (breastActive && !formulaActive) formulaCount = 0;
+    if (!breastActive && formulaActive) breastfeedCount = 0;
+
+    const mealBase = filledNumber(baseline.meal_count)
+      ? Number(baseline.meal_count)
+      : Number(pickActual(recent, 'meal_count'));
+    const snackBase = filledNumber(baseline.snack_count)
+      ? Number(baseline.snack_count)
+      : Number(pickActual(recent, 'snack_count'));
+    const tempBase = filledNumber(baseline.baby_temp)
+      ? Number(baseline.baby_temp)
+      : Number(pickActual(recent, 'baby_temp'));
+    const mlBase = filledNumber(baseline.formula_ml)
+      ? Number(baseline.formula_ml)
+      : Number(pickActual(recent, 'formula_ml'));
+
+    const noteStyle = noteStyleFromFirst(firstRecord?.notes, motherName);
+
+    return {
+      incision_status: modeArray(recent.map((r) => r.incision_status), filledArray(baseline.incision_status) ? baseline.incision_status : ['이상없음']),
+      breast_status: modeArray(recent.map((r) => r.breast_status), filledArray(baseline.breast_status) ? baseline.breast_status : ['이상없음']),
+      urination_bowel_status: modeArray(recent.map((r) => r.urination_bowel_status), filledArray(baseline.urination_bowel_status) ? baseline.urination_bowel_status : ['이상없음']),
+      sitz_bath: mode(recent.map((r) => r.sitz_bath), baseline.sitz_bath || '미실시'),
+      meal_count: Number.isFinite(mealBase) ? varyCount(mealBase, 1, 4, 1) : null,
+      snack_count: Number.isFinite(snackBase) ? varyCount(snackBase, 0, 3, 1) : null,
+      baby_temp: Number.isFinite(tempBase) ? varyTemp(tempBase) : null,
+      sleep_status: mode(recent.map((r) => r.sleep_status), baseline.sleep_status || '잘잠'),
+      breastfeed_count: breastfeedCount,
       formula_count: formulaCount,
-      formula_ml: formulaCount === 0 ? null : pickActual(recent, 'formula_ml'),
-      stool_status: mode(recent.map((r) => r.stool_status), '정상변'),
-      bath_cord_status: mode(recent.map((r) => r.bath_cord_status), '실시'),
-      notes: variedNote(recent, usedNotes, motherName)
+      formula_ml: formulaActive && Number.isFinite(mlBase) ? varyMl(mlBase) : null,
+      stool_status: mode(recent.map((r) => r.stool_status), baseline.stool_status || '정상변'),
+      bath_cord_status: mode(recent.map((r) => r.bath_cord_status), baseline.bath_cord_status || '실시'),
+      notes: variedNote(recent, usedNotes, motherName, noteStyle)
     };
-    return result;
   }
 
-  function buildGenericThreeWeekDraft(usedNotes = null, motherName = '') {
-    return {
-      incision_status: ['이상없음'],
-      breast_status: ['이상없음'],
-      urination_bowel_status: ['이상없음'],
-      sitz_bath: '미실시',
-      meal_count: null,
-      snack_count: null,
-      baby_temp: null,
-      sleep_status: '잘잠',
-      breastfeed_count: null,
-      formula_count: null,
-      formula_ml: null,
-      stool_status: '정상변',
-      bath_cord_status: '실시',
-      notes: variedNote([], usedNotes, motherName)
-    };
+  function firstDayReady(record) {
+    if (!record?.id || !record?.service_date) return false;
+    if (!filledArray(record.incision_status)) return false;
+    if (!filledArray(record.breast_status)) return false;
+    if (!filledArray(record.urination_bowel_status)) return false;
+    if (!filledText(record.sitz_bath)) return false;
+    if (!filledNumber(record.meal_count)) return false;
+    if (!filledNumber(record.snack_count)) return false;
+    if (!filledNumber(record.baby_temp)) return false;
+    if (!filledText(record.sleep_status)) return false;
+    if (!filledNumber(record.breastfeed_count)) return false;
+    if (!filledNumber(record.formula_count)) return false;
+    if (Number(record.formula_count) > 0 && !filledNumber(record.formula_ml)) return false;
+    if (!filledText(record.stool_status)) return false;
+    if (!filledText(record.bath_cord_status)) return false;
+    if (!filledText(record.notes)) return false;
+    return true;
   }
 
   function setGroup(name, wanted) {
@@ -387,19 +455,12 @@
 
   async function prepareAllDrafts(caseId, button) {
     if (!isAdmin()) return;
-    const ok = window.confirm(
-      '전체 일차의 빈칸을 자동으로 채우고 바로 저장하시겠습니까?\n\n' +
-      '기존 입력값·산모 서명·기타서비스는 건드리지 않습니다.\n' +
-      '빈 서비스 날짜는 시작일 기준으로 주말과 2026년 공휴일·대체공휴일·명절·선거일을 제외해 자동 입력합니다.\n' +
-      '저장 후 각 일차를 열어 바로 산모 서명을 입력하거나 수정할 수 있습니다.'
-    );
-    if (!ok) return;
 
     if (button) button.disabled = true;
     try {
       const { data: rows, error } = await sb
         .from('daily_records')
-        .select('service_day,service_date,locked,incision_status,breast_status,urination_bowel_status,sitz_bath,meal_count,snack_count,baby_temp,sleep_status,breastfeed_count,formula_count,formula_ml,stool_status,bath_cord_status,other_service,notes')
+        .select('id,service_day,service_date,locked,incision_status,breast_status,urination_bowel_status,sitz_bath,meal_count,snack_count,baby_temp,sleep_status,breastfeed_count,formula_count,formula_ml,stool_status,bath_cord_status,other_service,notes')
         .eq('case_id', caseId)
         .order('service_day');
       if (error) throw error;
@@ -409,95 +470,91 @@
           ? currentCase
           : null;
 
-      if (!serviceMeta?.service_days || !serviceMeta?.start_date) {
+      if (!serviceMeta?.service_days) {
         const { data: serviceCase, error: caseError } = await sb
           .from('service_cases')
-          .select('service_days,start_date,mother_name')
+          .select('service_days,mother_name')
           .eq('id', caseId)
           .single();
         if (caseError) throw caseError;
         serviceMeta = { ...(serviceMeta || {}), ...(serviceCase || {}) };
       }
 
-      const totalDays = Number(serviceMeta?.service_days || 0);
-      const startDate = serviceMeta?.start_date || null;
-      if (!startDate) {
-        throw new Error('서비스 시작일이 없습니다. 서비스 정보 수정에서 시작일을 먼저 입력해주세요.');
-      }
-
       const actual = rows || [];
       const byDay = new Map(actual.map((row) => [Number(row.service_day), row]));
+      const firstRecord = byDay.get(1);
+
+      if (!firstDayReady(firstRecord)) {
+        alertMsg('전체 자동채우기를 하려면 먼저 1일차를 직접 모두 입력하고 저장해주세요. 1일차 서비스 날짜·수유·체온·식사/간식·특이사항 등이 기준이 됩니다.');
+        return;
+      }
+
+      const ok = window.confirm(
+        '1일차 기록을 기준으로 나머지 빈 일차의 자동 초안을 만들까요?\n\n' +
+        '수유 방식·수유량·체온·식사/간식 횟수·특이사항 말투를 1일차 흐름에 맞춰 조금씩 다르게 제안합니다.\n' +
+        '날짜는 1일차 실제 서비스 날짜부터 주말과 2026년 공휴일을 제외해 이어집니다.\n' +
+        '자동 초안은 바로 확정 저장하지 않으며 각 일차에서 확인 후 저장합니다.'
+      );
+      if (!ok) return;
+
+      const totalDays = Number(serviceMeta?.service_days || 0);
+      const firstServiceDate = firstRecord.service_date;
       const usedAutoNotes = new Set(
         actual.map((row) => String(row.notes || '').trim()).filter(Boolean)
       );
-      const savedDays = [];
-      const generatedRows = [];
+      const drafts = {};
 
-      for (let day = 1; day <= totalDays; day += 1) {
+      for (let day = 2; day <= totalDays; day += 1) {
         const row = byDay.get(day);
-        if (!recordNeedsDraft(row)) continue;
         if (row?.locked) continue;
+        if (row && !recordNeedsDraft(row)) continue;
 
-        const previous = [...actual, ...generatedRows]
+        const previous = actual
           .filter((item) => Number(item.service_day) < day)
           .sort((a, b) => Number(b.service_day) - Number(a.service_day))
           .slice(0, 5);
 
-        const hasPrevious = previous.length > 0;
-        const generatedDraft = hasPrevious
-          ? buildFromPrevious(previous, usedAutoNotes, serviceMeta?.mother_name || '')
-          : buildGenericThreeWeekDraft(usedAutoNotes, serviceMeta?.mother_name || '');
+        const referenceRecords = previous.length ? previous : [firstRecord];
+        const generatedDraft = buildFromPrevious(
+          referenceRecords,
+          usedAutoNotes,
+          serviceMeta?.mother_name || '',
+          firstRecord
+        );
         if (generatedDraft.notes) usedAutoNotes.add(generatedDraft.notes);
 
-        const serviceDate = row?.service_date || weekdayDateForServiceDay(startDate, day);
-        if (!serviceDate) continue;
-
-        const payload = mergeAutoRecord(caseId, day, row, generatedDraft, serviceDate);
-
-        let result;
-        if (row?.id) {
-          result = await sb
-            .from('daily_records')
-            .update(payload)
-            .eq('id', row.id)
-            .select()
-            .single();
-        } else {
-          result = await sb
-            .from('daily_records')
-            .insert(payload)
-            .select()
-            .single();
-        }
-        if (result.error) throw result.error;
-
-        savedDays.push(Number(day));
-        generatedRows.push(result.data);
-        byDay.set(Number(day), result.data);
+        drafts[day] = {
+          draft: generatedDraft,
+          service_date: row?.service_date || serviceDateFromFirst(firstServiceDate, day) || null,
+          basis: 'day1_trend',
+          reference_service_days: referenceRecords.map((item) => Number(item.service_day)),
+          prepared_at: new Date().toISOString()
+        };
       }
 
-      saveBulkDrafts(caseId, {});
+      if (!saveBulkDrafts(caseId, drafts)) throw new Error('브라우저에 전체 초안을 저장하지 못했습니다.');
+      markPreparedButtons(caseId);
 
       try {
         await sb.from('record_audit').insert({
           record_id: null,
           case_id: caseId,
           actor_id: me?.id || null,
-          action: 'admin_bulk_missing_records_autosaved',
+          action: 'admin_day1_based_bulk_drafts_prepared',
           details: {
-            saved_service_days: savedDays,
-            auto_date_start: startDate,
-            auto_date_rule: 'weekdays_excluding_2026_korean_public_holidays',
-            count: savedDays.length
+            prepared_service_days: Object.keys(drafts).map(Number),
+            first_service_date: firstServiceDate,
+            auto_date_rule: 'weekdays_excluding_2026_official_public_holidays',
+            count: Object.keys(drafts).length
           }
         });
       } catch (auditError) {
-        console.warn('bulk autosave audit error', auditError);
+        console.warn('day1 bulk draft audit error', auditError);
       }
 
-      if (savedDays.length) {
+      if (Object.keys(drafts).length) {
         alertMsg(
-          `총 ${savedDays.length}개 일차의 빈칸을 채우고 바로 저장했습니다.\n\n각 일차를 열면 기록 저장을 다시 누르지 않고 바로 산모 서명을 입력·수정할 수 있습니다.`
+          `1일차 기록을 기준으로 총 ${Object.keys(drafts).length}개 일차의 초안을 준비했습니다.\n\n각 일차를 열어 실제 내용과 날짜를 확인한 뒤 저장해주세요.`
         );
         await window.openCase(caseId, true);
       } else {
@@ -525,14 +582,14 @@
     button.id = 'adminBulkMissingDraft';
     button.type = 'button';
     button.className = 'secondary full';
-    button.textContent = '전체 빈칸 자동 채우기 · 바로 저장';
+    button.textContent = '1일차 기준 전체 초안 만들기';
     button.style.fontWeight = '900';
     button.onclick = () => prepareAllDrafts(caseId, button);
 
     const help = document.createElement('div');
     help.className = 'muted tiny';
     help.style.marginTop = '6px';
-    help.textContent = '전체 일차의 빈칸과 빈 날짜를 자동으로 채운 뒤 바로 저장합니다. 날짜는 2026년 공휴일을 제외하며, 체온·수유량·식사/간식 횟수는 이전 실제 기록값이 있을 때만 그 값들 중에서 제안합니다. 기존 입력값·서명·기타서비스는 유지됩니다.';
+    help.textContent = '1일차를 직접 입력·저장한 뒤 사용합니다. 수유방법·수유량·체온·식사/간식·특이사항 말투를 1일차 기준으로 조금씩 다르게 초안 제안하며, 날짜는 주말·2026년 공휴일을 제외합니다.';
 
     wrap.append(button, help);
     row.insertAdjacentElement('afterend', wrap);
@@ -557,34 +614,42 @@
       }
     }
 
-    addDraftNotice(
-      prepared.basis === 'previous_records'
-        ? `전체 초안 · 이전 ${prepared.reference_service_days?.length || 0}개 기록 참고`
-        : '전체 초안 · 이전 기록 없음 · 3주차 일반 초안값 적용'
-    );
+    addDraftNotice('1일차 기준 자동 초안 · 실제 내용 확인 필요');
   }
 
   async function fillMissingDraft(day, button) {
     button.disabled = true;
     try {
+      const { data: firstRecord, error: firstError } = await sb
+        .from('daily_records')
+        .select('*')
+        .eq('case_id', currentCase.id)
+        .eq('service_day', 1)
+        .maybeSingle();
+      if (firstError) throw firstError;
+      if (!firstDayReady(firstRecord)) {
+        alertMsg('먼저 1일차를 직접 모두 입력하고 저장해주세요.');
+        return;
+      }
+
       const { data: previous, error } = await sb
         .from('daily_records')
-        .select('service_day,incision_status,breast_status,urination_bowel_status,sitz_bath,meal_count,snack_count,baby_temp,sleep_status,breastfeed_count,formula_count,formula_ml,stool_status,bath_cord_status,other_service,notes')
+        .select('*')
         .eq('case_id', currentCase.id)
         .lt('service_day', Number(day))
         .order('service_day', { ascending: false })
         .limit(5);
       if (error) throw error;
 
-      const hasPrevious = (previous || []).length > 0;
-      const draft = hasPrevious ? buildFromPrevious(previous, null, currentCase?.mother_name || '') : buildGenericThreeWeekDraft(null, currentCase?.mother_name || '');
-      applyDraft(draft);
-
-      addDraftNotice(
-        hasPrevious
-          ? `최근 ${Math.min(previous.length, 5)}일 기록 패턴 참고`
-          : '이전 기록 없음 · 3주차 일반 초안값 적용'
+      const referenceRecords = (previous || []).length ? previous : [firstRecord];
+      const draft = buildFromPrevious(
+        referenceRecords,
+        null,
+        currentCase?.mother_name || '',
+        firstRecord
       );
+      applyDraft(draft);
+      addDraftNotice('1일차 및 앞선 실제 기록 참고');
 
       try {
         await sb.from('record_audit').insert({
@@ -594,8 +659,8 @@
           action: 'admin_missing_record_draft_applied',
           details: {
             service_day: Number(day),
-            basis: hasPrevious ? 'previous_records' : 'generic_three_week_draft',
-            reference_service_days: hasPrevious ? previous.map((r) => r.service_day) : []
+            basis: 'day1_and_previous_records',
+            reference_service_days: referenceRecords.map((r) => Number(r.service_day))
           }
         });
       } catch (auditError) {
@@ -628,7 +693,7 @@
     const help = document.createElement('div');
     help.className = 'muted tiny';
     help.style.marginTop = '5px';
-    help.textContent = '비어 있는 항목만 채우며 기존 입력값·서비스 날짜·서명·기타서비스는 건드리지 않습니다.';
+    help.textContent = '1일차와 앞선 실제 기록을 참고해 현재 일차의 빈칸만 초안으로 채웁니다. 날짜·서명·기타서비스는 건드리지 않습니다.';
 
     const dateInput = document.getElementById('serviceDate');
     if (dateInput) {
