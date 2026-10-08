@@ -67,7 +67,7 @@
     [...main.querySelectorAll('.card')].forEach((card) => {
       const heading = card.querySelector('h3')?.textContent?.trim();
       if (heading === '등록된 관리사') attachSearch(card, 'caregiver');
-      if (heading === '서비스 현황') attachSearch(card, 'case');
+      if (heading?.startsWith('서비스 현황')) attachSearch(card, 'case');
     });
   }
 
