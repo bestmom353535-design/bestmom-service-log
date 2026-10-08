@@ -1,6 +1,6 @@
 (() => {
-  if (window.__BESTMOM_ADMIN_BULK_SIGNATURE_V78__) return;
-  window.__BESTMOM_ADMIN_BULK_SIGNATURE_V78__ = true;
+  if (window.__BESTMOM_ADMIN_BULK_SIGNATURE_V82__) return;
+  window.__BESTMOM_ADMIN_BULK_SIGNATURE_V82__ = true;
 
   const previousOpenCase = window.openCase;
   if (typeof previousOpenCase !== 'function') return;
@@ -21,7 +21,8 @@
         .order('service_day');
       if (error) throw error;
 
-      const source = (rows || []).find((row) => Number(row.service_day) === 1);
+      const savedRows = rows || [];
+      const source = savedRows.find((row) => Number(row.service_day) === 1);
       if (!source) {
         alertMsg('1일차 기록이 없습니다. 먼저 1일차 기록을 저장해주세요.');
         return;
@@ -31,7 +32,24 @@
         return;
       }
 
-      const unsigned = (rows || []).filter(
+      const expectedDays = Number(
+        typeof currentCase !== 'undefined' && currentCase?.id === caseId
+          ? currentCase.service_days
+          : 0
+      );
+      const isActiveCase =
+        typeof currentCase !== 'undefined' &&
+        currentCase?.id === caseId &&
+        currentCase?.status === 'active';
+
+      if (isActiveCase && expectedDays > 0 && savedRows.length < expectedDays) {
+        alertMsg(
+          `현재 ${expectedDays}일 중 ${savedRows.length}일차만 저장되어 있어 전체 서명을 적용할 수 없습니다.\n\n먼저 ‘1일차 기준 전체 자동 입력’을 눌러 나머지 일차 기록을 저장해주세요.`
+        );
+        return;
+      }
+
+      const unsigned = savedRows.filter(
         (row) => Number(row.service_day) !== 1 && !String(row.signature_data || '').trim()
       );
       if (!unsigned.length) {
@@ -54,11 +72,29 @@
       if (rpcError) throw rpcError;
 
       const copied = Number(data?.copied_count || 0);
-      alertMsg(
-        copied
-          ? `1일차 서명을 ${copied}개 일차에 적용했습니다. 기존 서명은 그대로 유지했습니다.`
-          : '새로 적용할 서명이 없습니다.'
-      );
+
+      const { data: verifiedRows, error: verifyError } = await sb
+        .from('daily_records')
+        .select('service_day,signature_data,locked')
+        .eq('case_id', caseId)
+        .order('service_day');
+      if (verifyError) throw verifyError;
+
+      const verified = verifiedRows || [];
+      const signedCount = verified.filter((row) => String(row.signature_data || '').trim()).length;
+      const unsignedAfter = verified.filter((row) => !String(row.signature_data || '').trim());
+
+      if (unsignedAfter.length) {
+        alertMsg(
+          `서명 적용을 다시 확인해주세요. 현재 저장된 ${verified.length}일 중 ${signedCount}일만 서명이 확인됩니다.`
+        );
+      } else if (verified.length) {
+        alertMsg(
+          `서명 적용 완료 · 저장된 ${verified.length}일 모두 서명이 확인되었습니다.\n새로 적용된 일차: ${copied}일`
+        );
+      } else {
+        alertMsg('저장된 일차 기록이 없어 서명을 적용하지 못했습니다.');
+      }
 
       await window.openCase(caseId, true);
     } catch (error) {
@@ -92,7 +128,7 @@
     const help = document.createElement('div');
     help.className = 'muted tiny';
     help.style.marginTop = '5px';
-    help.textContent = '1일차에 저장된 산모 서명을 서명이 없는 저장 일차에 한 번에 적용합니다. 이미 서명된 일차는 변경하지 않습니다.';
+    help.textContent = '1일차 서명을 저장한 뒤 사용합니다. 저장된 전체 일차에 적용하고, 적용 후 실제 서명 개수를 다시 확인합니다. 이미 서명된 일차는 변경하지 않습니다.';
 
     wrap.append(button, help);
     if (bulkDraftWrap) bulkDraftWrap.insertAdjacentElement('afterend', wrap);
