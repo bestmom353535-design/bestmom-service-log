@@ -54,6 +54,9 @@
         try {
           // 기록 저장 후 같은 일차 화면을 갱신한다.
           await withoutListNavigation(() => originalSaveDay(day, adminMode, false));
+          if (typeof window.refreshRecordStatus === 'function') {
+            await window.refreshRecordStatus(currentCase?.id);
+          }
           suppressNextDateScroll = true;
           await window.openDay(day, adminMode);
 
@@ -76,6 +79,9 @@
         try {
           // 최종 서명·잠금이 끝나면 일차 목록 위쪽으로 이동한다.
           await originalSaveDay(day, false, true);
+          if (typeof window.refreshRecordStatus === 'function') {
+            await window.refreshRecordStatus(currentCase?.id);
+          }
           setTimeout(() => {
             const main = document.getElementById('main');
             if (main) main.scrollIntoView({ behavior: 'smooth', block: 'start' });
