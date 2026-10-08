@@ -447,7 +447,7 @@
     button.id = 'adminBulkMissingDraft';
     button.type = 'button';
     button.className = 'secondary full';
-    button.textContent = '전체 빈칸 자동 채우기';
+    button.textContent = '전체 빈칸 자동 채우기 · 바로 저장';
     button.style.fontWeight = '900';
     button.onclick = () => prepareAllDrafts(caseId, button);
 
