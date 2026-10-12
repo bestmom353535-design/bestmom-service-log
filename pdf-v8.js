@@ -131,6 +131,35 @@
     ctx.restore();
   }
 
+  function drawChangeStamp(ctx, cx, cy) {
+    const red = '#ed1c24';
+    ctx.save();
+    ctx.lineWidth = 1.65;
+    ctx.strokeStyle = red;
+    ctx.fillStyle = red;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 9.85, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.font = `800 5.1px ${fontFamily}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('베스', cx, cy - 2.8, 15.5);
+    ctx.fillText('트맘', cx, cy + 2.8, 15.5);
+    ctx.restore();
+  }
+
+  function workerHistoryLabel(caseData, changes) {
+    const fallback = caseData.caregiver?.full_name || caseData.caregiver_name_override || '';
+    if (!changes?.length) return fallback;
+    const first = changes.find((x) => x.previous_name)?.previous_name || fallback;
+    const parts = [first];
+    for (const item of changes) {
+      if (!item.next_name) continue;
+      parts.push(`${item.next_name}(${item.effective_date ? fmtUnpaidDate(item.effective_date) : '일자 미입력'})`);
+    }
+    return parts.join(' → ');
+  }
+
   function countText(v) {
     return v === null || v === undefined || Number(v) === 0 ? '' : String(v);
   }
@@ -360,7 +389,7 @@
     return pages;
   }
 
-  async function overlayFor(caseData, records, unpaidReasons, pageIndex) {
+  async function overlayFor(caseData, records, unpaidReasons, pageIndex, caregiverChanges, changeStampId) {
     const canvas = document.createElement('canvas');
     canvas.width = PAGE_W * SCALE;
     canvas.height = PAGE_H * SCALE;
@@ -375,7 +404,8 @@
     centerText(ctx, caseData.baby_name, headerRects.baby_name, 10.5);
     centerText(ctx, fmtDate(caseData.baby_birth_date), headerRects.baby_birth, 10.5);
     centerText(ctx, caseData.birth_weight ?? '', headerRects.birth_weight, 10.5);
-    centerText(ctx, caseData.caregiver?.full_name || caseData.caregiver_name_override || '', headerRects.worker, 10.5);
+    const workerLabel = workerHistoryLabel(caseData, caregiverChanges);
+    centerText(ctx, workerLabel, headerRects.worker, workerLabel.length > 14 ? 8.4 : 10.5);
 
     const pageRecords = (records || []).filter((r) => Math.floor((Number(r.service_day) - 1) / 5) === pageIndex);
     for (const r of pageRecords) {
@@ -407,7 +437,15 @@
       }
 
       oneLine(ctx, r.other_service, [left, POS.other[0], right, POS.other[1]]);
-      notesAutoFit(ctx, r.notes, [left, POS.notes[0], right, POS.notes[1]]);
+      const dayChanges = (caregiverChanges || []).filter((change) =>
+        change.effective_date && change.effective_date === r.service_date);
+      const changeLines = dayChanges.map((change) =>
+        `${fmtUnpaidDate(change.effective_date)}일자에 ${change.next_name}으로 제공인력 변경`);
+      const combinedNotes = [changeLines.join('\n'), r.notes || ''].filter(Boolean).join('\n');
+      const putChangeStamp = dayChanges.some((change) => change.id === changeStampId);
+      notesAutoFit(ctx, combinedNotes, [left, POS.notes[0], putChangeStamp ? right - 20 : right, POS.notes[1]]);
+      // 제공인력 변경 안내에는 최초 변경일에 작은 원형 도장 1개만 추가한다.
+      if (putChangeStamp) drawChangeStamp(ctx, right - 11.3, POS.notes[0] + 13.0);
       await drawSignature(ctx, r.signature_data, [left, POS.sig[0], right, POS.sig[1]], r.service_day);
     }
 
@@ -467,6 +505,20 @@
       if (recRes.error) throw recRes.error;
       const records = recRes.data || [];
 
+      currentStage = '제공인력 변경 이력 불러오기';
+      stage(currentStage);
+      const changeRes = await sb
+        .from('caregiver_change_history')
+        .select('id,previous_name,next_name,effective_date,created_at')
+        .eq('case_id', caseId)
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true });
+      if (changeRes.error) throw changeRes.error;
+      const caregiverChanges = changeRes.data || [];
+      const changeStampId = caregiverChanges.find((change) =>
+        change.effective_date && records.some((record) => record.service_date === change.effective_date)
+      )?.id || null;
+
       currentStage = '미결제 사유 불러오기';
       stage(currentStage);
       const unpaidRes = await sb
@@ -520,7 +572,7 @@
       for (let i = 0; i < need; i++) {
         currentStage = `${i + 1}페이지 기록 그리기`;
         stage(currentStage);
-        const pngBytes = await overlayFor(caseData, records, unpaidPages[i] || [], i);
+        const pngBytes = await overlayFor(caseData, records, unpaidPages[i] || [], i, caregiverChanges, changeStampId);
 
         currentStage = `${i + 1}페이지 PDF에 적용`;
         stage(currentStage);
