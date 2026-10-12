@@ -72,6 +72,14 @@
       const caregiverList = (caregivers || []).filter((x) => x.active || x.id === serviceCase.caregiver_id);
       const currentCaregiver = caregiverList.find((x) => x.id === serviceCase.caregiver_id) || null;
       const currentCaregiverName = currentCaregiver?.full_name || serviceCase.caregiver_name_override || '';
+      const historyRes = await sb.from('caregiver_change_history')
+        .select('id,previous_name,next_name,effective_date,created_at')
+        .eq('case_id', caseId)
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true });
+      if (historyRes.error) throw historyRes.error;
+      const caregiverHistory = historyRes.data || [];
+      const md = (date) => date ? `${Number(String(date).slice(5,7))}/${Number(String(date).slice(8,10))}` : '변경일 미입력';
 
       removeModal();
       const overlay = document.createElement('div');
@@ -120,9 +128,23 @@
             <button type="button" id="editCaregiverClear" class="secondary" style="margin-top:7px;width:auto;min-height:34px;padding:6px 10px;font-size:12px">관리사 미지정으로 변경</button>
           </div>
 
+          <div id="editCaregiverChangeDateWrap" class="notice mt" style="display:none;background:#eff6ff;border-color:#bfdbfe">
+            <label for="editCaregiverChangeDate">새 관리사 실제 투입일 (필수)</label>
+            <input type="date" id="editCaregiverChangeDate" style="margin-top:6px">
+            <div class="muted tiny mt">이 날짜부터 새 관리사로 변경됩니다. PDF의 제공인력 이름과 해당 일자의 특이사항에 자동으로 표시됩니다.</div>
+          </div>
           <div class="notice mt" style="background:#f8fafc;border-color:#e5e7eb">
             관리사 등록 전이라면 이름만 직접 입력해도 저장할 수 있습니다. 미등록 이름은 기록지에는 표시되지만 관리사 로그인과는 연결되지 않습니다. 등록된 관리사를 선택하면 해당 계정으로 배정됩니다.
           </div>
+          ${caregiverHistory.length ? `<div class="card mt" style="box-shadow:none;border:1px solid #e5e7eb">
+            <h4 style="margin:0 0 8px">기존 관리사 변경 이력</h4>
+            <p class="muted tiny">이전에 변경한 건은 실제 교체일을 입력해야 기록지 특이사항에 자동 반영됩니다.</p>
+            ${caregiverHistory.map((item) => `<div class="row mt" style="flex-wrap:wrap;align-items:center;gap:8px">
+              <span style="flex:1 1 170px;font-size:13px">${esc(item.previous_name)} → ${esc(item.next_name)}</span>
+              <input type="date" data-history-date="${item.id}" value="${esc(item.effective_date || '')}" aria-label="교체 시작일" style="flex:0 1 155px">
+              <button type="button" class="secondary" data-history-save="${item.id}" style="width:auto;min-height:34px;padding:6px 10px;font-size:12px">날짜 저장</button>
+            </div>`).join('')}
+          </div>` : ''}
 
           <div class="row" style="justify-content:flex-end;margin-top:16px">
             <button type="button" id="adminCaseEditCancel" class="secondary" style="width:auto">취소</button>
@@ -135,6 +157,38 @@
       const hiddenId = document.getElementById('editCaregiverId');
       const selected = document.getElementById('editCaregiverSelected');
       const results = document.getElementById('editCaregiverResults');
+      const changeDateWrap = document.getElementById('editCaregiverChangeDateWrap');
+      const actualReplacement = () => {
+        const newId = hiddenId.value || null;
+        const picked = caregiverList.find((x) => x.id === newId);
+        const newName = picked?.full_name || search.value.trim();
+        const changed = (serviceCase.caregiver_id || null) !== newId
+          || (serviceCase.caregiver_name_override || null) !== (newId ? null : (search.value.trim() || null));
+        return !!(currentCaregiverName && newName && currentCaregiverName !== newName && changed);
+      };
+      const refreshChangeDate = () => {
+        changeDateWrap.style.display = actualReplacement() ? 'block' : 'none';
+      };
+      overlay.querySelectorAll('[data-history-save]').forEach((button) => {
+        button.onclick = async () => {
+          const historyId = Number(button.dataset.historySave);
+          const dateInput = overlay.querySelector(`[data-history-date="${historyId}"]`);
+          const actualDate = dateInput?.value || null;
+          if (!actualDate) return alertMsg('실제 교체 시작일을 선택해주세요.');
+          button.disabled = true;
+          try {
+            const { data, error } = await sb.from('caregiver_change_history')
+              .update({ effective_date: actualDate })
+              .eq('id', historyId).eq('case_id', caseId).select('id');
+            if (error) throw error;
+            if (!data?.length) throw new Error('날짜가 저장되지 않았습니다. 권한을 확인해주세요.');
+            alertMsg('관리사 변경일을 저장했습니다. 제공기록지 PDF에 반영됩니다.');
+          } catch (error) {
+            console.error(error);
+            alertMsg(`교체일 저장 실패: ${error?.message || ''}`);
+          } finally { button.disabled = false; }
+        };
+      });
 
       const showMatches = () => {
         const query = search.value.trim();
@@ -161,6 +215,7 @@
               search.value = cg.full_name;
               selected.textContent = `선택됨: ${cg.full_name} 관리사`;
               results.style.display = 'none';
+              refreshChangeDate();
             };
             results.appendChild(button);
           });
@@ -180,6 +235,7 @@
             : '선택됨: 미지정';
         }
         showMatches();
+        refreshChangeDate();
       });
       search.addEventListener('focus', showMatches);
 
@@ -188,7 +244,9 @@
         search.value = '';
         selected.textContent = '선택됨: 미지정';
         results.style.display = 'none';
+        refreshChangeDate();
       };
+      refreshChangeDate();
 
       document.getElementById('adminCaseEditClose').onclick = removeModal;
       document.getElementById('adminCaseEditCancel').onclick = removeModal;
@@ -211,8 +269,14 @@
           caregiver_id: hiddenId.value || null,
           caregiver_name_override: hiddenId.value
             ? null
-            : (search.value.trim() || null)
+            : (search.value.trim() || null),
+          caregiver_change_effective_date: actualReplacement()
+            ? (document.getElementById('editCaregiverChangeDate').value || null)
+            : null
         };
+        if (actualReplacement() && !payload.caregiver_change_effective_date) {
+          return alertMsg('관리사가 변경되는 날짜를 반드시 선택해주세요.');
+        }
 
         if (![5, 10, 15, 20].includes(payload.service_days)) {
           return alertMsg('서비스 기간을 다시 선택해주세요.');
@@ -247,7 +311,7 @@
         const serviceDaysChanged = Number(serviceCase.service_days) !== payload.service_days;
         const startDateChanged = (serviceCase.start_date || null) !== payload.start_date;
         const changeLines = [];
-        if (caregiverChanged) changeLines.push(`관리사: ${oldCaregiverName} → ${newCaregiverName}`);
+        if (caregiverChanged) changeLines.push(`관리사: ${oldCaregiverName} → ${newCaregiverName}${payload.caregiver_change_effective_date ? ' (' + md(payload.caregiver_change_effective_date) + '부터)' : ''}`);
         if (serviceDaysChanged) changeLines.push(`서비스 기간: ${serviceCase.service_days}일 → ${payload.service_days}일`);
         if (startDateChanged) changeLines.push(`시작일: ${serviceCase.start_date || '미입력'} → ${payload.start_date || '미입력'}`);
 
@@ -282,7 +346,8 @@
                   caregiver_name_before: oldCaregiverName === '미지정' ? null : oldCaregiverName,
                   caregiver_name_after: newCaregiverName === '미지정' ? null : newCaregiverName,
                   caregiver_name_override_before: serviceCase.caregiver_name_override || null,
-                  caregiver_name_override_after: payload.caregiver_name_override || null
+                  caregiver_name_override_after: payload.caregiver_name_override || null,
+                  caregiver_effective_date: payload.caregiver_change_effective_date || null
                 }
               });
             }
