@@ -148,46 +148,134 @@
     ctx.restore();
   }
 
-  // PDF는 5일차마다 새 페이지. 교체 이력 전체를 누적하지 않고
-  // 실제 교체가 포함된 페이지에만 이전 → 신규(날짜)를 표시한다.
-  // 교체가 없는 페이지는 해당 시점에 근무 중인 제공인력 한 명만 표시한다.
-  function workerLabelForPage(caseData, changes, records, pageIndex) {
-    const fallback = caseData.caregiver?.full_name || caseData.caregiver_name_override || '';
-    const datedChanges = (changes || [])
-      .filter((change) => change.effective_date && change.previous_name && change.next_name)
-      .sort((a, b) => String(a.effective_date).localeCompare(String(b.effective_date))
-        || String(a.created_at || '').localeCompare(String(b.created_at || ''))
-        || Number(a.id || 0) - Number(b.id || 0));
-    if (!datedChanges.length) return fallback;
+  // 제공인력 변경은 서비스 정보 수정 내역과 실제 일별 기록 작성자(관리사 계정)를 함께 사용한다.
+  // 모든 변경을 누적하지 않고 변경이 속한 5일 단위 페이지만 표시한다.
+  function buildCaregiverTimeline(caseData, records, savedChanges) {
+    const currentName = caseData.caregiver?.full_name || caseData.caregiver_name_override || '';
+    const sortedRecords = [...(records || [])]
+      .filter((row) => row.service_date && Number(row.service_day) >= 1)
+      .sort((a, b) => Number(a.service_day) - Number(b.service_day));
+    const history = [...(savedChanges || [])].sort((a, b) =>
+      String(a.created_at || '').localeCompare(String(b.created_at || '')) ||
+      Number(a.id || 0) - Number(b.id || 0)
+    );
+    const writerName = (row) =>
+      row?.record_writer?.role === 'caregiver' ? String(row.record_writer.full_name || '').trim() : '';
+    const firstWriter = sortedRecords.find((row) => writerName(row));
+    const originalName = firstWriter && Number(firstWriter.service_day) === 1
+      ? writerName(firstWriter)
+      : (history.find((item) => item.previous_name)?.previous_name || writerName(firstWriter) || currentName);
+    const events = [];
+    let activeName = originalName;
 
-    const datedRecords = (records || [])
-      .filter((record) => record.service_date && Number(record.service_day) >= 1)
-      .map((record) => ({
-        date: String(record.service_date),
-        page: Math.floor((Number(record.service_day) - 1) / 5)
-      }))
-      .sort((a, b) => a.date.localeCompare(b.date) || a.page - b.page);
-    if (!datedRecords.length) return fallback;
-
-    const timeline = datedChanges.map((change) => {
-      // 변경 당일 기록이 아직 없으면 그 이후 가장 가까운 작성일 페이지로 연결한다.
-      const firstOnOrAfter = datedRecords.find((record) => record.date >= String(change.effective_date));
-      return { ...change, page: firstOnOrAfter ? firstOnOrAfter.page : null };
-    });
-
-    const changesOnPage = timeline.filter((change) => change.page === pageIndex);
-    if (changesOnPage.length) {
-      return changesOnPage.map((change) =>
-        `${change.previous_name} → ${change.next_name}(${fmtUnpaidDate(change.effective_date)})`
-      ).join(' / ');
+    // 서명·기록 작성자의 원래 계정 정보는 관리사 교체 후에도 덮어써지지 않는다.
+    for (const record of sortedRecords) {
+      const actualWriter = writerName(record);
+      if (!actualWriter) continue;
+      if (!activeName) { activeName = actualWriter; continue; }
+      if (actualWriter !== activeName) {
+        events.push({
+          id: 'record-' + record.service_day,
+          previous_name: activeName,
+          next_name: actualWriter,
+          effective_date: String(record.service_date),
+          service_day: Number(record.service_day),
+          source: 'record'
+        });
+        activeName = actualWriter;
+      }
     }
 
-    const earlier = timeline.filter((change) => change.page !== null && change.page < pageIndex);
-    if (earlier.length) return earlier[earlier.length - 1].next_name;
+    const serviceDayOnOrAfter = (date) => {
+      const match = sortedRecords.find((row) => String(row.service_date) >= date);
+      return match ? Number(match.service_day) : null;
+    };
+    const localEditDate = (value) => {
+      if (!value) return null;
+      const timestamp = new Date(value);
+      if (Number.isNaN(timestamp.valueOf())) return null;
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit'
+      }).format(timestamp);
+    };
 
-    const upcoming = timeline.find((change) => change.page !== null && change.page > pageIndex);
-    if (upcoming) return upcoming.previous_name;
-    return fallback;
+    // 수정 창에서 입력한 실제 교체일은 우선 적용한다.
+    // 과거 이력에 교체일이 없으면 작성자 변경 기록을 활용하고, 없는 변경은 수정일과
+    // 서비스일이 정확히 일치할 때만 그 페이지에 반영한다.
+    for (const item of history) {
+      if (!item.next_name || !item.previous_name || item.next_name === item.previous_name) continue;
+      const existing = events.find((event) => event.next_name === item.next_name);
+      const verifiedDate = item.effective_date ? String(item.effective_date) : null;
+      if (existing) {
+        if (verifiedDate) {
+          const day = serviceDayOnOrAfter(verifiedDate);
+          if (day !== null) {
+            existing.effective_date = verifiedDate;
+            existing.service_day = day;
+            existing.source = 'explicit';
+          }
+        }
+        continue;
+      }
+      const editedDate = localEditDate(item.created_at);
+      const matchedEditDay = editedDate && sortedRecords.some((r) => String(r.service_date) === editedDate);
+      const date = verifiedDate || (matchedEditDay ? editedDate : null);
+      const day = date ? serviceDayOnOrAfter(date) : null;
+      if (day === null) continue; // 실제 날짜를 확인할 수 없는 경우 임의로 배치하지 않는다.
+      events.push({
+        id: 'history-' + item.id,
+        previous_name: item.previous_name,
+        next_name: item.next_name,
+        effective_date: date,
+        service_day: day,
+        source: verifiedDate ? 'explicit' : 'edit-date'
+      });
+    }
+
+    events.sort((a, b) => a.service_day - b.service_day ||
+      (a.source === 'record' ? -1 : 1) ||
+      String(a.id).localeCompare(String(b.id)));
+
+    // 실제 기록 작성자와 충돌하는 과거의 '수정일만 확인된' 변경은 출력하지 않는다.
+    const cleanEvents = events.filter((item) => {
+      if (item.source !== 'edit-date') return true;
+      const record = sortedRecords.find((r) => String(r.service_date) === item.effective_date);
+      return !record || !writerName(record) || writerName(record) === item.next_name;
+    });
+    return { initial_name: originalName || currentName, events: cleanEvents };
+  }
+
+  function workerLabelForPage(caseData, timeline, pageIndex) {
+    const pageChanges = timeline.events.filter((item) =>
+      Math.floor((Number(item.service_day) - 1) / 5) === pageIndex);
+    if (pageChanges.length) {
+      return pageChanges.map((change) =>
+        `${change.previous_name} → ${change.next_name}(${fmtUnpaidDate(change.effective_date)})`
+      ).join('\n');
+    }
+    const before = timeline.events.filter((item) =>
+      Math.floor((Number(item.service_day) - 1) / 5) < pageIndex);
+    return before.length
+      ? before[before.length - 1].next_name
+      : timeline.initial_name || caseData.caregiver?.full_name || caseData.caregiver_name_override || '';
+  }
+
+  function drawWorkerLabel(ctx, label, rect) {
+    const lines = String(label || '').split('\n').filter(Boolean);
+    if (!lines.length) return;
+    const maxWidth = rect[2] - rect[0] - 5;
+    const maxHeight = rect[3] - rect[1] - 4;
+    const size = Math.min(10.5, Math.max(6.2, (maxHeight / lines.length) - 2));
+    ctx.save();
+    setFont(ctx, size);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const lineHeight = Math.min(size * 1.24, maxHeight / lines.length);
+    const startY = (rect[1] + rect[3]) / 2 - (lines.length - 1) * lineHeight / 2;
+    lines.forEach((line, i) => {
+      ctx.fillText(line, (rect[0] + rect[2]) / 2, startY + i * lineHeight, maxWidth);
+    });
+    ctx.restore();
   }
 
   function countText(v) {
@@ -419,7 +507,7 @@
     return pages;
   }
 
-  async function overlayFor(caseData, records, unpaidReasons, pageIndex, caregiverChanges, changeStampId) {
+  async function overlayFor(caseData, records, unpaidReasons, pageIndex, timeline, changeStampId) {
     const canvas = document.createElement('canvas');
     canvas.width = PAGE_W * SCALE;
     canvas.height = PAGE_H * SCALE;
@@ -434,8 +522,8 @@
     centerText(ctx, caseData.baby_name, headerRects.baby_name, 10.5);
     centerText(ctx, fmtDate(caseData.baby_birth_date), headerRects.baby_birth, 10.5);
     centerText(ctx, caseData.birth_weight ?? '', headerRects.birth_weight, 10.5);
-    const workerLabel = workerLabelForPage(caseData, caregiverChanges, records, pageIndex);
-    centerText(ctx, workerLabel, headerRects.worker, workerLabel.length > 14 ? 8.4 : 10.5);
+    const workerLabel = workerLabelForPage(caseData, timeline, pageIndex);
+    drawWorkerLabel(ctx, workerLabel, headerRects.worker);
 
     const pageRecords = (records || []).filter((r) => Math.floor((Number(r.service_day) - 1) / 5) === pageIndex);
     for (const r of pageRecords) {
@@ -467,8 +555,8 @@
       }
 
       oneLine(ctx, r.other_service, [left, POS.other[0], right, POS.other[1]]);
-      const dayChanges = (caregiverChanges || []).filter((change) =>
-        change.effective_date && change.effective_date === r.service_date);
+      const dayChanges = timeline.events.filter((change) =>
+        Number(change.service_day) === Number(r.service_day));
       const changeLines = dayChanges.map((change) =>
         `${fmtUnpaidDate(change.effective_date)}일자에 ${change.next_name}으로 제공인력 변경`);
       const combinedNotes = [changeLines.join('\n'), r.notes || ''].filter(Boolean).join('\n');
@@ -529,7 +617,7 @@
       stage(currentStage);
       const recRes = await sb
         .from('daily_records')
-        .select('*')
+        .select('*,record_writer:profiles!daily_records_created_by_fkey(full_name,role)')
         .eq('case_id', caseId)
         .order('service_day');
       if (recRes.error) throw recRes.error;
@@ -545,8 +633,9 @@
         .order('id', { ascending: true });
       if (changeRes.error) throw changeRes.error;
       const caregiverChanges = changeRes.data || [];
-      const changeStampId = caregiverChanges.find((change) =>
-        change.effective_date && records.some((record) => record.service_date === change.effective_date)
+      const timeline = buildCaregiverTimeline(caseData, records, caregiverChanges);
+      const changeStampId = timeline.events.find((change) =>
+        records.some((record) => Number(record.service_day) === Number(change.service_day))
       )?.id || null;
 
       currentStage = '미결제 사유 불러오기';
@@ -602,7 +691,7 @@
       for (let i = 0; i < need; i++) {
         currentStage = `${i + 1}페이지 기록 그리기`;
         stage(currentStage);
-        const pngBytes = await overlayFor(caseData, records, unpaidPages[i] || [], i, caregiverChanges, changeStampId);
+        const pngBytes = await overlayFor(caseData, records, unpaidPages[i] || [], i, timeline, changeStampId);
 
         currentStage = `${i + 1}페이지 PDF에 적용`;
         stage(currentStage);
