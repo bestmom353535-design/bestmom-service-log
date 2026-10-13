@@ -146,6 +146,12 @@
             </div>`).join('')}
           </div>` : ''}
 
+          <div class="card mt" style="border:1px solid #dbeafe;box-shadow:none;background:#f8fbff">
+            <h4 style="margin:0 0 7px">제공인력 실제 근무일 확인</h4>
+            <p class="muted tiny">관리사별 근무 시작일·마지막 근무일을 한눈에 확인하고, 실제 근무자를 일차별 또는 기간별로 수정할 수 있습니다. PDF에는 확인 후 저장한 내용을 우선 적용합니다.</p>
+            <button type="button" id="cgDayScheduleOpen" class="secondary mt" style="width:auto">제공인력 근무일 확인 · 수정</button>
+          </div>
+
           <div class="row" style="justify-content:flex-end;margin-top:16px">
             <button type="button" id="adminCaseEditCancel" class="secondary" style="width:auto">취소</button>
             <button type="button" id="adminCaseEditSave" class="primary" style="width:auto;min-width:130px">수정내용 저장</button>
@@ -248,6 +254,11 @@
       };
       refreshChangeDate();
 
+      document.getElementById('cgDayScheduleOpen').onclick = () => {
+        if (typeof window.openCaregiverDayEditor !== 'function')
+          return alertMsg('제공인력 근무일 수정 기능이 아직 준비되지 않았습니다. 새로고침해주세요.');
+        window.openCaregiverDayEditor(caseId);
+      };
       document.getElementById('adminCaseEditClose').onclick = removeModal;
       document.getElementById('adminCaseEditCancel').onclick = removeModal;
       overlay.onclick = (event) => { if (event.target === overlay) removeModal(); };
