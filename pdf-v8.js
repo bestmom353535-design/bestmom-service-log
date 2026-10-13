@@ -680,6 +680,31 @@
       if (recRes.error) throw recRes.error;
       const records = recRes.data || [];
 
+      currentStage = '누락 근무일 불러오기';
+      stage(currentStage);
+      const missingRes = await sb.from('caregiver_missing_days')
+        .select('id,service_date,caregiver_name')
+        .eq('case_id',caseId).order('service_date');
+      if (missingRes.error) throw missingRes.error;
+      const missingDays = missingRes.data || [];
+      const recordedDates = new Set(records.map(record => String(record.service_date)));
+      const displayRecords = [
+        ...records.map(record => ({...record,original_service_day:record.service_day})),
+        ...missingDays
+          .filter(day => !recordedDates.has(String(day.service_date)))
+          .map(day => ({
+            service_date:day.service_date,
+            service_day:null,
+            is_missing_day:true,
+            missing_id:day.id,
+            verified_personnel_name:day.caregiver_name,
+            signature_data:null, notes:null
+          }))
+      ].filter(record => record.service_date)
+       .sort((x,y)=>String(x.service_date).localeCompare(String(y.service_date)) ||
+         Number(x.original_service_day||999)-Number(y.original_service_day||999))
+       .map((record,index) => ({...record,service_day:index+1}));
+
       currentStage = '제공인력 변경 이력 불러오기';
       stage(currentStage);
       const changeRes = await sb
@@ -690,16 +715,27 @@
         .order('id', { ascending: true });
       if (changeRes.error) throw changeRes.error;
       const caregiverChanges = changeRes.data || [];
-      const baseTimeline = buildCaregiverTimeline(caseData, records, caregiverChanges);
+      const baseTimeline = buildCaregiverTimeline(caseData, displayRecords, caregiverChanges);
       currentStage = '운영자 확인 근무일 불러오기';
       stage(currentStage);
       const verifiedRes = await sb.from('caregiver_day_assignments')
         .select('service_day,service_date,caregiver_name')
         .eq('case_id',caseId).order('service_day');
       if (verifiedRes.error) throw verifiedRes.error;
-      const timeline = applyVerifiedDayAssignments(baseTimeline, records, verifiedRes.data || [],caseData.service_days);
+      const adjustedOverrides = (verifiedRes.data || []).map(item => {
+        const original = records.find(record => Number(record.service_day) === Number(item.service_day));
+        const date = item.service_date || original?.service_date;
+        const display = displayRecords.find(record => record.service_date === date);
+        return display ? {...item,service_day:display.service_day,service_date:date} : null;
+      }).filter(Boolean);
+      const combinedOverrides = [
+        ...adjustedOverrides,
+        ...displayRecords.filter(record => record.is_missing_day)
+          .map(record => ({service_day:record.service_day,service_date:record.service_date,caregiver_name:record.verified_personnel_name}))
+      ];
+      const timeline = applyVerifiedDayAssignments(baseTimeline, displayRecords, combinedOverrides,caseData.service_days);
       const changeStampId = timeline.events.find((change) =>
-        !change.silent && change.effective_date && records.some((record) => Number(record.service_day) === Number(change.service_day))
+        !change.silent && change.effective_date && displayRecords.some((record) => Number(record.service_day) === Number(change.service_day))
       )?.id || null;
 
       currentStage = '미결제 사유 불러오기';
@@ -728,7 +764,7 @@
 
       const contractedPages = Math.max(1, Math.ceil(Number(caseData.service_days || 0) / 5));
       const recordedDays = [...new Set(
-        records
+        displayRecords
           .map((record) => Number(record?.service_day))
           .filter((day) => Number.isFinite(day) && day > 0)
       )];
@@ -750,12 +786,12 @@
       if (unpaidReasons.length > capacity) {
         throw new Error(`미결제 사유가 원본 PDF 입력 칸보다 많습니다. 최대 ${capacity}건까지 입력할 수 있습니다.`);
       }
-      const unpaidPages = distributeUnpaidReasons(records, unpaidReasons, need);
+      const unpaidPages = distributeUnpaidReasons(displayRecords, unpaidReasons, need);
 
       for (let i = 0; i < need; i++) {
         currentStage = `${i + 1}페이지 기록 그리기`;
         stage(currentStage);
-        const pngBytes = await overlayFor(caseData, records, unpaidPages[i] || [], i, timeline, changeStampId);
+        const pngBytes = await overlayFor(caseData, displayRecords, unpaidPages[i] || [], i, timeline, changeStampId);
 
         currentStage = `${i + 1}페이지 PDF에 적용`;
         stage(currentStage);
