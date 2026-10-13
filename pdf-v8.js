@@ -564,7 +564,15 @@
     return pages;
   }
 
-  async function overlayFor(caseData, records, unpaidReasons, pageIndex, timeline, changeStampId) {
+  function shouldStampCaregiverChange(dayChanges, writtenNotes) {
+    // 자동 교체 이력은 매 변경일마다 한 번씩 도장을 찍고,
+    // 직접 작성된 특이사항에 제공인력/관리사 교체가 적혀 있어도 빠뜨리지 않는다.
+    if ((dayChanges || []).length > 0) return true;
+    const note = String(writtenNotes || '').replace(/\s+/g, ' ').trim();
+    return /(?:제공인력|관리사|담당\s*인력|대체\s*인력|근무\s*인력).{0,30}(?:변경|교체)|(?:변경|교체).{0,30}(?:제공인력|관리사|담당\s*인력|대체\s*인력|근무\s*인력)/.test(note);
+  }
+
+  async function overlayFor(caseData, records, unpaidReasons, pageIndex, timeline) {
     const canvas = document.createElement('canvas');
     canvas.width = PAGE_W * SCALE;
     canvas.height = PAGE_H * SCALE;
@@ -617,9 +625,9 @@
       const changeLines = dayChanges.map((change) =>
         `${fmtUnpaidDate(change.effective_date)}일자에 ${change.next_name}으로 제공인력 변경`);
       const combinedNotes = [changeLines.join('\n'), r.notes || ''].filter(Boolean).join('\n');
-      const putChangeStamp = dayChanges.some((change) => change.id === changeStampId);
+      const putChangeStamp = shouldStampCaregiverChange(dayChanges, r.notes);
       notesAutoFit(ctx, combinedNotes, [left, POS.notes[0], putChangeStamp ? right - 20 : right, POS.notes[1]]);
-      // 제공인력 변경 안내에는 최초 변경일에 작은 원형 도장 1개만 추가한다.
+      // 1~4페이지 전체: 제공인력 변경 내용이 있는 모든 날짜의 특이사항마다 작은 원형 도장 1개.
       if (putChangeStamp) drawChangeStamp(ctx, right - 11.3, POS.notes[0] + 13.0);
       await drawSignature(ctx, r.signature_data, [left, POS.sig[0], right, POS.sig[1]], r.service_day);
     }
@@ -734,10 +742,6 @@
           .map(record => ({service_day:record.service_day,service_date:record.service_date,caregiver_name:record.verified_personnel_name}))
       ];
       const timeline = applyVerifiedDayAssignments(baseTimeline, displayRecords, combinedOverrides,caseData.service_days);
-      const changeStampId = timeline.events.find((change) =>
-        !change.silent && change.effective_date && displayRecords.some((record) => Number(record.service_day) === Number(change.service_day))
-      )?.id || null;
-
       currentStage = '미결제 사유 불러오기';
       stage(currentStage);
       const unpaidRes = await sb
@@ -791,7 +795,7 @@
       for (let i = 0; i < need; i++) {
         currentStage = `${i + 1}페이지 기록 그리기`;
         stage(currentStage);
-        const pngBytes = await overlayFor(caseData, displayRecords, unpaidPages[i] || [], i, timeline, changeStampId);
+        const pngBytes = await overlayFor(caseData, displayRecords, unpaidPages[i] || [], i, timeline);
 
         currentStage = `${i + 1}페이지 PDF에 적용`;
         stage(currentStage);
