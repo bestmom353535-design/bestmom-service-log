@@ -117,7 +117,7 @@
 
           <div class="mt" style="position:relative">
             <label>배정 관리사</label>
-            <input id="editCaregiverSearch" type="search" autocomplete="off" placeholder="관리사 이름 검색 또는 미등록 이름 직접 입력" value="${esc(currentCaregiverName)}">
+            <input id="editCaregiverSearch" type="search" autocomplete="off" placeholder="관리사 이름 검색 또는 직접 입력 (예: 김영숙)" value="${esc(currentCaregiverName)}">
             <input id="editCaregiverId" type="hidden" value="${esc(serviceCase.caregiver_id || '')}">
             <div id="editCaregiverSelected" class="muted tiny" style="margin-top:5px">${currentCaregiver
               ? `현재 배정: ${esc(currentCaregiver.full_name)} 관리사`
