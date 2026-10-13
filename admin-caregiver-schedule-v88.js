@@ -151,6 +151,7 @@
             <p class="muted tiny">관리사 계정 등록이나 앞뒤 근무기간 수정 없이, 딱 하루만 이름을 저장합니다.</p>
             <div class="grid3">
               <div><label>해당 일차</label><select id="cgQuickDay">
+                <option value="">일차 선택</option>
                 ${rows.map(r=>`<option value="${r.day}">${r.day}일차 · ${esc(r.date ? shortDate(r.date) : '날짜 입력 필요')}</option>`).join('')}
               </select></div>
               <div><label>실제 근무 날짜</label><input id="cgQuickDate" type="date"></div>
