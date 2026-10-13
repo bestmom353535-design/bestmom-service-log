@@ -265,12 +265,18 @@
     if (!lines.length) return;
     const maxWidth = rect[2] - rect[0] - 5;
     const maxHeight = rect[3] - rect[1] - 4;
-    const size = Math.min(10.5, Math.max(6.2, (maxHeight / lines.length) - 2));
     ctx.save();
-    setFont(ctx, size);
+    let size = Math.min(lines.length > 1 ? 8.2 : 10.5, (maxHeight / lines.length) - 1);
+    // 원본 PDF의 좁은 제공인력 칸에 글자가 찌그러져 보이지 않도록 너비에 맞춰 폰트를 조절한다.
+    while (size > 5.4) {
+      setFont(ctx, size);
+      if (lines.every((line) => ctx.measureText(line).width <= maxWidth)) break;
+      size -= 0.2;
+    }
+    setFont(ctx, Math.max(5.4, size));
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const lineHeight = Math.min(size * 1.24, maxHeight / lines.length);
+    const lineHeight = Math.min(size * 1.22, maxHeight / lines.length);
     const startY = (rect[1] + rect[3]) / 2 - (lines.length - 1) * lineHeight / 2;
     lines.forEach((line, i) => {
       ctx.fillText(line, (rect[0] + rect[2]) / 2, startY + i * lineHeight, maxWidth);
