@@ -254,6 +254,51 @@
     return { initial_name: originalName || currentName, events: cleanEvents };
   }
 
+  // 운영자가 일차별로 확인한 제공인력 배정이 있으면
+  // 저장된 배정을 최우선 적용해 PDF 페이지 표기와 변경일 특이사항을 구성한다.
+  function applyVerifiedDayAssignments(baseTimeline, records, assignments) {
+    if (!(assignments || []).length) return baseTimeline;
+    const namesByDay = new Map((assignments || [])
+      .map(item => [Number(item.service_day), String(item.caregiver_name || '').trim()])
+      .filter(([day, name]) => Number.isInteger(day) && day >= 1 && name));
+    if (!namesByDay.size) return baseTimeline;
+    const dateRecords = [...(records || [])]
+      .filter(record => record.service_date && Number(record.service_day) >= 1)
+      .sort((a, b) => Number(a.service_day) - Number(b.service_day));
+    if (!dateRecords.length) return baseTimeline;
+
+    const baseEvents = [...(baseTimeline.events || [])]
+      .sort((a,b) => Number(a.service_day) - Number(b.service_day));
+    const baseNameOnDay = (day) => {
+      let name = baseTimeline.initial_name || '';
+      for (const event of baseEvents) {
+        if (Number(event.service_day) > day) break;
+        name = event.next_name || name;
+      }
+      return name;
+    };
+    let lastName = namesByDay.get(Number(dateRecords[0].service_day)) ||
+      baseNameOnDay(Number(dateRecords[0].service_day));
+    const timeline = {initial_name:lastName || baseTimeline.initial_name,events:[]};
+    for (const record of dateRecords.slice(1)) {
+      const day = Number(record.service_day);
+      const name = namesByDay.get(day) || baseNameOnDay(day);
+      if (!name) continue;
+      if (lastName && name !== lastName) {
+        timeline.events.push({
+          id: 'verified-day-' + day,
+          previous_name:lastName,
+          next_name:name,
+          effective_date:String(record.service_date),
+          service_day:day,
+          source:namesByDay.has(day) ? 'operator-verified' : 'other-record'
+        });
+      }
+      lastName = name;
+    }
+    return timeline;
+  }
+
   function workerLabelForPage(caseData, timeline, pageIndex) {
     const pageChanges = timeline.events.filter((item) =>
       Math.floor((Number(item.service_day) - 1) / 5) === pageIndex);
@@ -648,7 +693,14 @@
         .order('id', { ascending: true });
       if (changeRes.error) throw changeRes.error;
       const caregiverChanges = changeRes.data || [];
-      const timeline = buildCaregiverTimeline(caseData, records, caregiverChanges);
+      const baseTimeline = buildCaregiverTimeline(caseData, records, caregiverChanges);
+      currentStage = '운영자 확인 근무일 불러오기';
+      stage(currentStage);
+      const verifiedRes = await sb.from('caregiver_day_assignments')
+        .select('service_day,caregiver_name')
+        .eq('case_id',caseId).order('service_day');
+      if (verifiedRes.error) throw verifiedRes.error;
+      const timeline = applyVerifiedDayAssignments(baseTimeline, records, verifiedRes.data || []);
       const changeStampId = timeline.events.find((change) =>
         records.some((record) => Number(record.service_day) === Number(change.service_day))
       )?.id || null;
