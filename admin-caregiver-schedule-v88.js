@@ -88,7 +88,7 @@
     const old = document.getElementById('caregiverScheduleModal');
     old?.remove();
     try {
-      const [caseRes, recordRes, historyRes, manualRes, cgRes] = await Promise.all([
+      const [caseRes, recordRes, historyRes, manualRes, cgRes, missingRes] = await Promise.all([
         sb.from('service_cases')
           .select('id,mother_name,service_days,start_date,caregiver_name_override,caregiver:profiles!service_cases_caregiver_id_fkey(full_name)')
           .eq('id',caseId).single(),
@@ -101,30 +101,54 @@
         sb.from('caregiver_day_assignments')
           .select('service_day,service_date,caregiver_name,updated_at')
           .eq('case_id',caseId).order('service_day'),
-        sb.from('profiles').select('full_name').eq('role','caregiver').order('full_name')
+        sb.from('profiles').select('full_name').eq('role','caregiver').order('full_name'),
+        sb.from('caregiver_missing_days').select('id,service_date,caregiver_name')
+          .eq('case_id',caseId).order('service_date')
       ]);
-      for (const response of [caseRes, recordRes, historyRes, manualRes, cgRes]) {
+      for (const response of [caseRes, recordRes, historyRes, manualRes, cgRes, missingRes]) {
         if (response.error) throw response.error;
       }
       const serviceCase = caseRes.data;
-      const rows = getSourceSuggestion(serviceCase, recordRes.data || [], historyRes.data || []);
-      const actualRecordDays = new Set((recordRes.data || []).filter(x=>x.service_date).map(x=>Number(x.service_day)));
-      const manualData = new Map((manualRes.data || []).map(x=>[Number(x.service_day), x]));
-      for (const row of rows) {
-        const assignment = manualData.get(row.day);
-        if (!row.date && assignment?.service_date) {
-          row.date = assignment.service_date;
-          row.source = '운영자 입력 날짜 · 제공기록 미작성';
-        }
+      const originalRecords = recordRes.data || [];
+      const missingDays = missingRes.data || [];
+      const combinedRecords = [
+        ...originalRecords.map(x=>({...x,original_day:Number(x.service_day)})),
+        ...missingDays.map(x=>({
+          service_date:x.service_date,missing_id:x.id,verified_name:x.caregiver_name,
+          original_day:null,record_writer:null
+        }))
+      ].filter(x=>x.service_date)
+       .sort((a,b)=>String(a.service_date).localeCompare(String(b.service_date)))
+       .map((x,index)=>({...x,service_day:index+1}));
+      if (combinedRecords.length > Number(serviceCase.service_days)) {
+        throw new Error('등록 기간보다 실제 근무일이 많습니다. 누락 날짜 목록을 확인해주세요.');
       }
-      const manual = new Map((manualRes.data || []).map((x) => [Number(x.service_day), x.caregiver_name]));
+      const rows = getSourceSuggestion(serviceCase,combinedRecords,historyRes.data||[]);
+      const combinedByDay = new Map(combinedRecords.map(x=>[x.service_day,x]));
+      const actualRecordDays = new Set(combinedRecords.filter(x=>x.original_day!==null).map(x=>x.service_day));
+      const assignmentsByOriginal = new Map((manualRes.data||[]).map(x=>[Number(x.service_day),x]));
+      const manual = new Map();
+      for (const row of rows) {
+        const record = combinedByDay.get(row.day);
+        const assignment = record?.original_day!=null ?
+          assignmentsByOriginal.get(record.original_day) : null;
+        if (assignment?.caregiver_name) manual.set(row.day,assignment.caregiver_name);
+        if (record?.missing_id) {
+          manual.set(row.day,record.verified_name);
+          row.suggested=record.verified_name;
+          row.source='추가 등록된 근무일';
+        }
+        row.originalDay=record?.original_day??null;
+        row.missingId=record?.missing_id||null;
+      }
       const pending = new Map();
       const options = [...new Set([
         ...(cgRes.data || []).map(x => x.full_name),
         ...(historyRes.data || []).flatMap(x => [x.previous_name,x.next_name]),
         ...(recordRes.data || []).filter(x => x.record_writer?.role === 'caregiver')
           .map(x => x.record_writer.full_name),
-        ...manual.values()
+        ...manual.values(),
+        ...missingDays.map(x=>x.caregiver_name)
       ].filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
       const overlay = document.createElement('div');
       overlay.id = 'caregiverScheduleModal';
@@ -147,18 +171,22 @@
             <div id="cgScheduleSummary"></div>
           </div>
           <div class="card mt" style="border:1px solid #bfdbfe;box-shadow:none;background:#f8fbff">
-            <h4 style="margin:0 0 8px">하루 대체인력 바로 추가</h4>
-            <p class="muted tiny">관리사 계정 등록이나 앞뒤 근무기간 수정 없이, 딱 하루만 이름을 저장합니다.</p>
-            <div class="grid3">
-              <div><label>해당 일차</label><select id="cgQuickDay">
-                <option value="">일차 선택</option>
-                ${rows.map(r=>`<option value="${r.day}">${r.day}일차 · ${esc(r.date ? shortDate(r.date) : '날짜 입력 필요')}</option>`).join('')}
-              </select></div>
-              <div><label>실제 근무 날짜</label><input id="cgQuickDate" type="date"></div>
-              <div><label>그날의 제공인력</label><input id="cgQuickName" list="cgScheduleNames" maxlength="80" placeholder="이름을 직접 입력해도 됩니다"></div>
+            <h4 style="margin:0 0 8px">빠진 하루 근무일 추가</h4>
+            <p class="muted tiny">빠진 날짜와 실제 제공인력만 추가하세요. 일차는 실제 날짜순으로 자동 정렬됩니다. 기존 기록과 산모 서명은 수정되지 않습니다.</p>
+            <div class="grid">
+              <div><label>실제 근무 날짜</label><input id="cgMissingDate" type="date"></div>
+              <div><label>그날의 제공인력</label><input id="cgMissingName" list="cgScheduleNames" maxlength="80" placeholder="예: 정화진 (직접 입력 가능)"></div>
             </div>
-            <div class="muted tiny mt" id="cgQuickHint"></div>
-            <button type="button" id="cgQuickSave" class="primary mt" style="width:auto">이 하루만 추가 · 저장</button>
+            <button type="button" id="cgMissingAdd" class="primary mt" style="width:auto">빠진 날짜 추가</button>
+            ${missingDays.length?`<div class="mt" style="border-top:1px solid #dbeafe;padding-top:9px">
+              <b style="font-size:13px">추가한 누락 근무일</b>
+              ${missingDays.map(x=>`<div class="row mt" style="gap:5px;flex-wrap:wrap">
+                <input type="date" data-extra-date="${x.id}" value="${esc(x.service_date)}" style="flex:1;min-width:125px">
+                <input type="text" data-extra-name="${x.id}" list="cgScheduleNames" maxlength="80" value="${esc(x.caregiver_name)}" style="flex:1;min-width:95px">
+                <button type="button" class="secondary" data-extra-save="${x.id}" style="width:auto">수정</button>
+                <button type="button" class="secondary" data-extra-delete="${x.id}" style="width:auto">삭제</button>
+              </div>`).join('')}
+            </div>`:''}
           </div>
           <div class="card mt" style="border:1px solid #e5e7eb;box-shadow:none">
             <h4 style="margin:0 0 8px">여러 일차에 한 번에 적용</h4>
@@ -176,10 +204,10 @@
               ${rows.map((r) => `
                 <div data-cg-day="${r.day}" style="padding:10px 12px;border-bottom:1px solid #eef0f3">
                   <div class="row space" style="gap:8px;flex-wrap:wrap">
-                    <b style="font-size:13px">${r.day}일차 · ${esc(shortDate(r.date))}</b>
+                    <b style="font-size:13px">${r.day}일차 · ${esc(shortDate(r.date))}${r.missingId?' (누락근무 추가)':''}</b>
                     <span class="muted tiny" data-cg-state="${r.day}"></span>
                   </div>
-                  <div class="muted tiny" style="margin:4px 0 7px">기록 작성자: ${esc(r.recordWriter || '없음')}${r.writerRole === 'admin' ? ' (운영자 계정)' : ''} · ${esc(r.source)}</div>
+                  <div class="muted tiny" style="margin:4px 0 7px">${r.missingId?'기존 제공기록 없음 · 날짜만 추가됨':`기록 작성자: ${esc(r.recordWriter || '없음')}${r.writerRole === 'admin' ? ' (운영자 계정)' : ''}`} · ${esc(r.source)}</div>
                   <div class="row" style="align-items:center;gap:6px">
                     <input type="text" data-cg-input="${r.day}" list="cgScheduleNames" maxlength="80"
                       placeholder="${r.date ? '실제 제공인력 이름' : '서비스 날짜 미작성'}"
@@ -198,53 +226,63 @@
         </div>`;
       document.body.appendChild(overlay);
       const el = (selector) => overlay.querySelector(selector);
-      const quickDay = el('#cgQuickDay'), quickDate = el('#cgQuickDate');
-      const refreshQuickDate = () => {
-        const day = Number(quickDay.value);
-        const row = rows.find(x=>x.day===day);
-        const isRecorded = actualRecordDays.has(day);
-        quickDate.value = row?.date || '';
-        quickDate.disabled = isRecorded;
-        el('#cgQuickHint').textContent = isRecorded
-          ? '이미 작성된 서비스 날짜입니다. 이름만 넣으면 됩니다.'
-          : row?.date
-            ? '제공기록은 아직 작성되지 않았습니다. 실제 근무 날짜를 확인해주세요.'
-            : '제공기록 날짜가 없는 날입니다. 실제 근무 날짜도 입력하면 추가할 수 있습니다.';
-      };
-      quickDay.onchange = refreshQuickDate;
-      refreshQuickDate();
-      el('#cgQuickSave').onclick = async () => {
-        if (pending.size) {
-          alert('일차별 수정사항이 저장 대기 중입니다. 하단의 수정한 날짜 저장을 먼저 눌러주세요.');
-          return;
-        }
-        const day = Number(quickDay.value);
-        const name = el('#cgQuickName').value.trim();
-        const date = quickDate.value;
-        if (!Number.isInteger(day) || day<1 || day>Number(serviceCase.service_days)) return alert('일차를 선택해주세요.');
-        if (!date) return alert('실제 근무 날짜를 입력해주세요.');
-        if (!name || name.length>80) return alert('제공인력 이름을 80자 이내로 입력해주세요.');
-        const row = rows.find(x=>x.day===day);
-        const conflicts = rows.filter(x=>x.day!==day && x.date===date);
-        if (conflicts.length) return alert('이 날짜는 이미 '+conflicts[0].day+'일차에 입력되어 있습니다. 일차를 다시 선택해주세요.');
-        if (!window.confirm(`${day}일차 (${shortDate(date)})의 제공인력을 '${name}'님으로 저장할까요?\n앞뒤 날짜의 근무인력은 변경하지 않습니다.`)) return;
-        const button = el('#cgQuickSave');
-        button.disabled=true;
+      el('#cgMissingAdd').onclick=async()=>{
+        const date=el('#cgMissingDate').value;
+        const name=el('#cgMissingName').value.trim();
+        if(!date || !name) return alert('실제 근무 날짜와 제공인력 이름을 입력해주세요.');
+        if(name.length>80) return alert('제공인력 이름은 80자 이내로 입력해주세요.');
+        if(combinedRecords.some(r=>r.service_date===date))
+          return alert('이미 등록된 근무 날짜입니다. 아래 일차별 이름을 수정해주세요.');
+        if(combinedRecords.length>=Number(serviceCase.service_days))
+          return alert('등록 서비스 일수를 초과합니다. 기간을 먼저 확인해주세요.');
+        if(pending.size) return alert('다른 수정사항을 먼저 저장해주세요.');
+        if(!window.confirm(`${shortDate(date)}에 ${name}님이 근무한 날짜를 추가할까요?\n기존 기록과 산모 서명은 그대로 보존됩니다.`))return;
+        const btn=el('#cgMissingAdd');btn.disabled=true;
         try {
-          const {error} = await sb.rpc('admin_save_caregiver_day_assignments',{
-            p_case_id:caseId,
-            p_changes:[{service_day:day,caregiver_name:name,service_date:date}]
-          });
-          if (error) throw error;
+          const {data,error}=await sb.from('caregiver_missing_days')
+            .insert({case_id:caseId,service_date:date,caregiver_name:name,created_by:me.id}).select('id');
+          if(error)throw error;
+          if(!data?.length)throw new Error('저장이 확인되지 않았습니다.');
           overlay.remove();
-          alert(`${shortDate(date)} 하루만 ${name}님으로 저장했습니다. PDF에도 해당 일차만 우선 적용됩니다.`);
+          alert('누락 근무일을 추가했습니다. 이제 일차가 날짜순으로 표시됩니다.');
           await openEditor(caseId);
-        } catch(err) {
-          console.error('하루 대체인력 저장 실패',err);
-          alert(`저장하지 못했습니다: ${err?.message || err}`);
-          button.disabled=false;
-        }
+        }catch(err){console.error(err);alert('추가 실패: '+(err.message||err));btn.disabled=false;}
       };
+      overlay.querySelectorAll('[data-extra-save]').forEach(btn=>{
+        btn.onclick=async()=>{
+          const id=btn.dataset.extraSave;
+          const date=el(`[data-extra-date="${id}"]`)?.value;
+          const name=el(`[data-extra-name="${id}"]`)?.value?.trim();
+          if(!date||!name)return alert('날짜와 관리사 이름을 확인해주세요.');
+          if(originalRecords.some(r=>r.service_date===date)||
+             missingDays.some(r=>r.id!==id&&r.service_date===date))
+            return alert('이미 있는 날짜입니다.');
+          btn.disabled=true;
+          try {
+            const {data,error}=await sb.from('caregiver_missing_days')
+              .update({service_date:date,caregiver_name:name})
+              .eq('id',id).eq('case_id',caseId).select('id');
+            if(error)throw error;
+            if(!data?.length)throw new Error('변경사항이 저장되지 않았습니다.');
+            overlay.remove();await openEditor(caseId);
+          }catch(err){console.error(err);alert('수정 실패: '+(err.message||err));btn.disabled=false;}
+        };
+      });
+      overlay.querySelectorAll('[data-extra-delete]').forEach(btn=>{
+        btn.onclick=async()=>{
+          const id=btn.dataset.extraDelete;
+          const record=missingDays.find(r=>r.id===id);
+          if(!window.confirm(`${shortDate(record?.service_date)} ${record?.caregiver_name||''} 추가 근무일을 삭제할까요?\n기존 서명된 기록은 변경되지 않습니다.`))return;
+          btn.disabled=true;
+          try {
+            const {data,error}=await sb.from('caregiver_missing_days').delete()
+              .eq('id',id).eq('case_id',caseId).select('id');
+            if(error)throw error;
+            if(!data?.length)throw new Error('삭제가 확인되지 않았습니다.');
+            overlay.remove();await openEditor(caseId);
+          }catch(err){console.error(err);alert('삭제 실패: '+(err.message||err));btn.disabled=false;}
+        };
+      });
       const displayName = (day) => pending.has(day) ? pending.get(day) : manual.get(day);
       const values = () => new Map(rows.map(r => [r.day,
         pending.has(r.day) ? (pending.get(r.day) || r.suggested) :
