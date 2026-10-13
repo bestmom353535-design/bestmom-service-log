@@ -99,7 +99,7 @@
           .select('id,previous_name,next_name,effective_date,created_at')
           .eq('case_id',caseId).order('created_at'),
         sb.from('caregiver_day_assignments')
-          .select('service_day,caregiver_name,updated_at')
+          .select('service_day,service_date,caregiver_name,updated_at')
           .eq('case_id',caseId).order('service_day'),
         sb.from('profiles').select('full_name').eq('role','caregiver').order('full_name')
       ]);
@@ -108,6 +108,15 @@
       }
       const serviceCase = caseRes.data;
       const rows = getSourceSuggestion(serviceCase, recordRes.data || [], historyRes.data || []);
+      const actualRecordDays = new Set((recordRes.data || []).filter(x=>x.service_date).map(x=>Number(x.service_day)));
+      const manualData = new Map((manualRes.data || []).map(x=>[Number(x.service_day), x]));
+      for (const row of rows) {
+        const assignment = manualData.get(row.day);
+        if (!row.date && assignment?.service_date) {
+          row.date = assignment.service_date;
+          row.source = '운영자 입력 날짜 · 제공기록 미작성';
+        }
+      }
       const manual = new Map((manualRes.data || []).map((x) => [Number(x.service_day), x.caregiver_name]));
       const pending = new Map();
       const options = [...new Set([
@@ -136,6 +145,19 @@
           <div class="card mt" style="border:1px solid #dbeafe;box-shadow:none">
             <h4 style="margin:0 0 7px">근무 기간 요약</h4>
             <div id="cgScheduleSummary"></div>
+          </div>
+          <div class="card mt" style="border:1px solid #bfdbfe;box-shadow:none;background:#f8fbff">
+            <h4 style="margin:0 0 8px">하루 대체인력 바로 추가</h4>
+            <p class="muted tiny">관리사 계정 등록이나 앞뒤 근무기간 수정 없이, 딱 하루만 이름을 저장합니다.</p>
+            <div class="grid3">
+              <div><label>해당 일차</label><select id="cgQuickDay">
+                ${rows.map(r=>`<option value="${r.day}">${r.day}일차 · ${esc(r.date ? shortDate(r.date) : '날짜 입력 필요')}</option>`).join('')}
+              </select></div>
+              <div><label>실제 근무 날짜</label><input id="cgQuickDate" type="date"></div>
+              <div><label>그날의 제공인력</label><input id="cgQuickName" list="cgScheduleNames" maxlength="80" placeholder="이름을 직접 입력해도 됩니다"></div>
+            </div>
+            <div class="muted tiny mt" id="cgQuickHint"></div>
+            <button type="button" id="cgQuickSave" class="primary mt" style="width:auto">이 하루만 추가 · 저장</button>
           </div>
           <div class="card mt" style="border:1px solid #e5e7eb;box-shadow:none">
             <h4 style="margin:0 0 8px">여러 일차에 한 번에 적용</h4>
@@ -175,6 +197,53 @@
         </div>`;
       document.body.appendChild(overlay);
       const el = (selector) => overlay.querySelector(selector);
+      const quickDay = el('#cgQuickDay'), quickDate = el('#cgQuickDate');
+      const refreshQuickDate = () => {
+        const day = Number(quickDay.value);
+        const row = rows.find(x=>x.day===day);
+        const isRecorded = actualRecordDays.has(day);
+        quickDate.value = row?.date || '';
+        quickDate.disabled = isRecorded;
+        el('#cgQuickHint').textContent = isRecorded
+          ? '이미 작성된 서비스 날짜입니다. 이름만 넣으면 됩니다.'
+          : row?.date
+            ? '제공기록은 아직 작성되지 않았습니다. 실제 근무 날짜를 확인해주세요.'
+            : '제공기록 날짜가 없는 날입니다. 실제 근무 날짜도 입력하면 추가할 수 있습니다.';
+      };
+      quickDay.onchange = refreshQuickDate;
+      refreshQuickDate();
+      el('#cgQuickSave').onclick = async () => {
+        if (pending.size) {
+          alert('일차별 수정사항이 저장 대기 중입니다. 하단의 수정한 날짜 저장을 먼저 눌러주세요.');
+          return;
+        }
+        const day = Number(quickDay.value);
+        const name = el('#cgQuickName').value.trim();
+        const date = quickDate.value;
+        if (!Number.isInteger(day) || day<1 || day>Number(serviceCase.service_days)) return alert('일차를 선택해주세요.');
+        if (!date) return alert('실제 근무 날짜를 입력해주세요.');
+        if (!name || name.length>80) return alert('제공인력 이름을 80자 이내로 입력해주세요.');
+        const row = rows.find(x=>x.day===day);
+        const conflicts = rows.filter(x=>x.day!==day && x.date===date);
+        if (conflicts.length) return alert('이 날짜는 이미 '+conflicts[0].day+'일차에 입력되어 있습니다. 일차를 다시 선택해주세요.');
+        if (!window.confirm(`${day}일차 (${shortDate(date)})의 제공인력을 '${name}'님으로 저장할까요?\n앞뒤 날짜의 근무인력은 변경하지 않습니다.`)) return;
+        const button = el('#cgQuickSave');
+        button.disabled=true;
+        try {
+          const {error} = await sb.rpc('admin_save_caregiver_day_assignments',{
+            p_case_id:caseId,
+            p_changes:[{service_day:day,caregiver_name:name,service_date:date}]
+          });
+          if (error) throw error;
+          overlay.remove();
+          alert(`${shortDate(date)} 하루만 ${name}님으로 저장했습니다. PDF에도 해당 일차만 우선 적용됩니다.`);
+          await openEditor(caseId);
+        } catch(err) {
+          console.error('하루 대체인력 저장 실패',err);
+          alert(`저장하지 못했습니다: ${err?.message || err}`);
+          button.disabled=false;
+        }
+      };
       const displayName = (day) => pending.has(day) ? pending.get(day) : manual.get(day);
       const values = () => new Map(rows.map(r => [r.day,
         pending.has(r.day) ? (pending.get(r.day) || r.suggested) :
