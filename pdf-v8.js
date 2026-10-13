@@ -206,20 +206,29 @@
       if (!item.next_name || !item.previous_name || item.next_name === item.previous_name) continue;
       const existing = events.find((event) => event.next_name === item.next_name);
       const verifiedDate = item.effective_date ? String(item.effective_date) : null;
+      const editedDate = localEditDate(item.created_at);
+      const editedRecord = editedDate && sortedRecords.find((r) => String(r.service_date) === editedDate);
+      // '서비스 정보 수정' 시각은 실제 교체일과 다를 수 있으므로, 해당 날짜가
+      // 서비스 기록에 존재하고 다른 관리사 본인이 작성한 기록과 충돌하지 않을 때만 사용한다.
+      const nonConflictingEditDate = editedRecord &&
+        (!writerName(editedRecord) || writerName(editedRecord) === item.next_name)
+          ? editedDate : null;
       if (existing) {
-        if (verifiedDate) {
-          const day = serviceDayOnOrAfter(verifiedDate);
+        const selectedDate = verifiedDate ||
+          (nonConflictingEditDate && nonConflictingEditDate <= existing.effective_date
+            ? nonConflictingEditDate : null);
+        if (selectedDate) {
+          const day = serviceDayOnOrAfter(selectedDate);
           if (day !== null) {
-            existing.effective_date = verifiedDate;
+            existing.effective_date = selectedDate;
             existing.service_day = day;
-            existing.source = 'explicit';
+            existing.source = verifiedDate ? 'explicit' : 'edit-date';
           }
         }
         continue;
       }
-      const editedDate = localEditDate(item.created_at);
-      const matchedEditDay = editedDate && sortedRecords.some((r) => String(r.service_date) === editedDate);
-      const date = verifiedDate || (matchedEditDay ? editedDate : null);
+      const matchedEditDay = !!nonConflictingEditDate;
+      const date = verifiedDate || (matchedEditDay ? nonConflictingEditDate : null);
       const day = date ? serviceDayOnOrAfter(date) : null;
       if (day === null) continue; // 실제 날짜를 확인할 수 없는 경우 임의로 배치하지 않는다.
       events.push({
