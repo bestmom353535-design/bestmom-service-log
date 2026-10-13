@@ -256,52 +256,49 @@
 
   // 운영자가 일차별로 확인한 제공인력 배정이 있으면
   // 저장된 배정을 최우선 적용해 PDF 페이지 표기와 변경일 특이사항을 구성한다.
-  function applyVerifiedDayAssignments(baseTimeline, records, assignments) {
+  function applyVerifiedDayAssignments(baseTimeline, records, assignments, serviceDays) {
     if (!(assignments || []).length) return baseTimeline;
-    const namesByDay = new Map((assignments || [])
-      .map(item => [Number(item.service_day), String(item.caregiver_name || '').trim()])
-      .filter(([day, name]) => Number.isInteger(day) && day >= 1 && name));
-    if (!namesByDay.size) return baseTimeline;
-    const dateRecords = [...(records || [])]
-      .filter(record => record.service_date && Number(record.service_day) >= 1)
-      .sort((a, b) => Number(a.service_day) - Number(b.service_day));
-    if (!dateRecords.length) return baseTimeline;
-
-    const baseEvents = [...(baseTimeline.events || [])]
-      .sort((a,b) => Number(a.service_day) - Number(b.service_day));
+    const assigned = new Map((assignments || [])
+      .map(a => [Number(a.service_day), a])
+      .filter(([day,a]) => Number.isInteger(day) && day>=1 && String(a.caregiver_name||'').trim()));
+    if (!assigned.size) return baseTimeline;
+    const recorded = new Map((records || []).filter(r => r.service_date)
+      .map(r => [Number(r.service_day), String(r.service_date)]));
+    const baseEvents = [...(baseTimeline.events || [])].sort((a,b) =>
+      Number(a.service_day)-Number(b.service_day));
     const baseNameOnDay = (day) => {
-      let name = baseTimeline.initial_name || '';
-      for (const event of baseEvents) {
-        if (Number(event.service_day) > day) break;
-        name = event.next_name || name;
+      let name=baseTimeline.initial_name || '';
+      for (const e of baseEvents) {
+        if (Number(e.service_day)>day) break;
+        name=e.next_name || name;
       }
       return name;
     };
-    let lastName = namesByDay.get(Number(dateRecords[0].service_day)) ||
-      baseNameOnDay(Number(dateRecords[0].service_day));
-    const timeline = {initial_name:lastName || baseTimeline.initial_name,events:[]};
-    for (const record of dateRecords.slice(1)) {
-      const day = Number(record.service_day);
-      const name = namesByDay.get(day) || baseNameOnDay(day);
-      if (!name) continue;
-      if (lastName && name !== lastName) {
+    const maxDay = Math.max(1,Number(serviceDays)||0,
+      ...recorded.keys(),...assigned.keys());
+    let lastName = assigned.get(1)?.caregiver_name || baseNameOnDay(1);
+    const timeline = {initial_name:lastName||baseTimeline.initial_name,events:[]};
+    for (let day=2;day<=maxDay;day++) {
+      const direct = assigned.get(day);
+      const name = String(direct?.caregiver_name||baseNameOnDay(day)||'').trim();
+      const date = recorded.get(day)||direct?.service_date||null;
+      if (name && lastName && name!==lastName) {
         timeline.events.push({
-          id: 'verified-day-' + day,
-          previous_name:lastName,
-          next_name:name,
-          effective_date:String(record.service_date),
-          service_day:day,
-          source:namesByDay.has(day) ? 'operator-verified' : 'other-record'
+          id:'verified-day-'+day,
+          previous_name:lastName,next_name:name,
+          effective_date:date,service_day:day,
+          silent:!date,
+          source:direct?'operator-verified':'other-record'
         });
       }
-      lastName = name;
+      if (name) lastName=name;
     }
     return timeline;
   }
 
   function workerLabelForPage(caseData, timeline, pageIndex) {
     const pageChanges = timeline.events.filter((item) =>
-      Math.floor((Number(item.service_day) - 1) / 5) === pageIndex);
+      !item.silent && item.effective_date && Math.floor((Number(item.service_day) - 1) / 5) === pageIndex);
     if (pageChanges.length) {
       return pageChanges.map((change) =>
         `${change.previous_name} → ${change.next_name}(${fmtUnpaidDate(change.effective_date)})`
@@ -616,7 +613,7 @@
 
       oneLine(ctx, r.other_service, [left, POS.other[0], right, POS.other[1]]);
       const dayChanges = timeline.events.filter((change) =>
-        Number(change.service_day) === Number(r.service_day));
+        !change.silent && change.effective_date && Number(change.service_day) === Number(r.service_day));
       const changeLines = dayChanges.map((change) =>
         `${fmtUnpaidDate(change.effective_date)}일자에 ${change.next_name}으로 제공인력 변경`);
       const combinedNotes = [changeLines.join('\n'), r.notes || ''].filter(Boolean).join('\n');
@@ -697,12 +694,12 @@
       currentStage = '운영자 확인 근무일 불러오기';
       stage(currentStage);
       const verifiedRes = await sb.from('caregiver_day_assignments')
-        .select('service_day,caregiver_name')
+        .select('service_day,service_date,caregiver_name')
         .eq('case_id',caseId).order('service_day');
       if (verifiedRes.error) throw verifiedRes.error;
-      const timeline = applyVerifiedDayAssignments(baseTimeline, records, verifiedRes.data || []);
+      const timeline = applyVerifiedDayAssignments(baseTimeline, records, verifiedRes.data || [],caseData.service_days);
       const changeStampId = timeline.events.find((change) =>
-        records.some((record) => Number(record.service_day) === Number(change.service_day))
+        !change.silent && change.effective_date && records.some((record) => Number(record.service_day) === Number(change.service_day))
       )?.id || null;
 
       currentStage = '미결제 사유 불러오기';
