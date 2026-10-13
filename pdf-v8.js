@@ -148,16 +148,46 @@
     ctx.restore();
   }
 
-  function workerHistoryLabel(caseData, changes) {
+  // PDF는 5일차마다 새 페이지. 교체 이력 전체를 누적하지 않고
+  // 실제 교체가 포함된 페이지에만 이전 → 신규(날짜)를 표시한다.
+  // 교체가 없는 페이지는 해당 시점에 근무 중인 제공인력 한 명만 표시한다.
+  function workerLabelForPage(caseData, changes, records, pageIndex) {
     const fallback = caseData.caregiver?.full_name || caseData.caregiver_name_override || '';
-    if (!changes?.length) return fallback;
-    const first = changes.find((x) => x.previous_name)?.previous_name || fallback;
-    const parts = [first];
-    for (const item of changes) {
-      if (!item.next_name) continue;
-      parts.push(`${item.next_name}(${item.effective_date ? fmtUnpaidDate(item.effective_date) : '일자 미입력'})`);
+    const datedChanges = (changes || [])
+      .filter((change) => change.effective_date && change.previous_name && change.next_name)
+      .sort((a, b) => String(a.effective_date).localeCompare(String(b.effective_date))
+        || String(a.created_at || '').localeCompare(String(b.created_at || ''))
+        || Number(a.id || 0) - Number(b.id || 0));
+    if (!datedChanges.length) return fallback;
+
+    const datedRecords = (records || [])
+      .filter((record) => record.service_date && Number(record.service_day) >= 1)
+      .map((record) => ({
+        date: String(record.service_date),
+        page: Math.floor((Number(record.service_day) - 1) / 5)
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date) || a.page - b.page);
+    if (!datedRecords.length) return fallback;
+
+    const timeline = datedChanges.map((change) => {
+      // 변경 당일 기록이 아직 없으면 그 이후 가장 가까운 작성일 페이지로 연결한다.
+      const firstOnOrAfter = datedRecords.find((record) => record.date >= String(change.effective_date));
+      return { ...change, page: firstOnOrAfter ? firstOnOrAfter.page : null };
+    });
+
+    const changesOnPage = timeline.filter((change) => change.page === pageIndex);
+    if (changesOnPage.length) {
+      return changesOnPage.map((change) =>
+        `${change.previous_name} → ${change.next_name}(${fmtUnpaidDate(change.effective_date)})`
+      ).join(' / ');
     }
-    return parts.join(' → ');
+
+    const earlier = timeline.filter((change) => change.page !== null && change.page < pageIndex);
+    if (earlier.length) return earlier[earlier.length - 1].next_name;
+
+    const upcoming = timeline.find((change) => change.page !== null && change.page > pageIndex);
+    if (upcoming) return upcoming.previous_name;
+    return fallback;
   }
 
   function countText(v) {
@@ -404,7 +434,7 @@
     centerText(ctx, caseData.baby_name, headerRects.baby_name, 10.5);
     centerText(ctx, fmtDate(caseData.baby_birth_date), headerRects.baby_birth, 10.5);
     centerText(ctx, caseData.birth_weight ?? '', headerRects.birth_weight, 10.5);
-    const workerLabel = workerHistoryLabel(caseData, caregiverChanges);
+    const workerLabel = workerLabelForPage(caseData, caregiverChanges, records, pageIndex);
     centerText(ctx, workerLabel, headerRects.worker, workerLabel.length > 14 ? 8.4 : 10.5);
 
     const pageRecords = (records || []).filter((r) => Math.floor((Number(r.service_day) - 1) / 5) === pageIndex);
