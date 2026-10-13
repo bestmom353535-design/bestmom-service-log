@@ -18,7 +18,7 @@
     if (!title) return;
 
     const isCaregiver = type === 'caregiver';
-    const placeholder = isCaregiver ? '관리사 이름 검색' : '산모명 또는 관리사명 검색';
+    const placeholder = isCaregiver ? '관리사 이름 검색 (예: 김영숙)' : '산모명 또는 관리사명 검색 (관리사 예: 김영숙)';
     const emptyText = isCaregiver ? '검색된 관리사가 없습니다.' : '검색된 서비스가 없습니다.';
 
     const wrap = document.createElement('div');
