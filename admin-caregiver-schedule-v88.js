@@ -175,7 +175,7 @@
             <p class="muted tiny">빠진 날짜와 실제 제공인력만 추가하세요. 일차는 실제 날짜순으로 자동 정렬됩니다. 기존 기록과 산모 서명은 수정되지 않습니다.</p>
             <div class="grid">
               <div><label>실제 근무 날짜</label><input id="cgMissingDate" type="date"></div>
-              <div><label>그날의 제공인력</label><input id="cgMissingName" list="cgScheduleNames" maxlength="80" placeholder="예: 정화진 (직접 입력 가능)"></div>
+              <div><label>그날의 제공인력</label><input id="cgMissingName" list="cgScheduleNames" maxlength="80" placeholder="예: 김영숙 (직접 입력 가능)"></div>
             </div>
             <button type="button" id="cgMissingAdd" class="primary mt" style="width:auto">빠진 날짜 추가</button>
             ${missingDays.length?`<div class="mt" style="border-top:1px solid #dbeafe;padding-top:9px">
@@ -193,7 +193,7 @@
             <div class="grid3">
               <div><label>시작 일차</label><select id="cgScheduleFrom"></select></div>
               <div><label>마지막 일차</label><select id="cgScheduleTo"></select></div>
-              <div><label>제공인력</label><input id="cgScheduleBulkName" list="cgScheduleNames" placeholder="이름 선택·입력"></div>
+              <div><label>제공인력</label><input id="cgScheduleBulkName" list="cgScheduleNames" placeholder="예: 김영숙"></div>
             </div>
             <button type="button" id="cgScheduleBulkApply" class="secondary mt" style="width:auto">선택한 기간에 적용</button>
             <p class="muted tiny mt">실제 날짜가 작성된 일차에만 적용됩니다. PDF에는 저장 이후 반영됩니다.</p>
@@ -210,7 +210,7 @@
                   <div class="muted tiny" style="margin:4px 0 7px">${r.missingId?'기존 제공기록 없음 · 날짜만 추가됨':`기록 작성자: ${esc(r.recordWriter || '없음')}${r.writerRole === 'admin' ? ' (운영자 계정)' : ''}`} · ${esc(r.source)}</div>
                   <div class="row" style="align-items:center;gap:6px">
                     <input type="text" data-cg-input="${r.day}" list="cgScheduleNames" maxlength="80"
-                      placeholder="${r.date ? '실제 제공인력 이름' : '서비스 날짜 미작성'}"
+                      placeholder="${r.date ? '예: 김영숙' : '서비스 날짜 미작성'}"
                       value="${esc(manual.get(r.day) || r.suggested)}" ${!r.date?'disabled':''}
                       style="flex:1;min-width:0">
                     <button type="button" class="secondary" data-cg-restore="${r.day}"
