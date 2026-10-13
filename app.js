@@ -110,6 +110,20 @@ async function invokeCaregiverAdmin(body) {
 async function adminCaregivers() {
   try {
     const list = await getCaregivers();
+    // 실제 관리사 계정으로 저장/서명한 마지막 시각 기준으로 정렬한다.
+    // 저장 활동이 전혀 없는 관리사는 마지막으로 보낸다.
+    const { data: recentSaves, error: recentError } = await sb
+      .rpc('admin_caregiver_last_record_saves');
+    if (recentError) throw recentError;
+    const lastSaveByCaregiver = new Map((recentSaves || [])
+      .filter(row => row.caregiver_id && row.last_saved_at)
+      .map(row => [row.caregiver_id, Date.parse(row.last_saved_at)]));
+    list.sort((a, b) => {
+      const left = lastSaveByCaregiver.get(a.id) || 0;
+      const right = lastSaveByCaregiver.get(b.id) || 0;
+      if (left !== right) return right - left;
+      return String(a.full_name || '').localeCompare(String(b.full_name || ''), 'ko');
+    });
     main().innerHTML = `
       <div class="card">
         <h3>관리사 등록</h3>
