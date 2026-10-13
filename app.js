@@ -190,9 +190,13 @@ window.toggleCaregiver = async (loginId, active) => {
 async function adminCases() {
   try {
     const caregivers = await getCaregivers();
+    // 서비스 현황은 진행 중인 서비스만 보여준다.
+    // 완료/중도종료/최종완성 건은 기존 전용 목록에서 조회한다.
     const { data: cases, error } = await sb
       .from('service_cases')
       .select('*,caregiver:profiles!service_cases_caregiver_id_fkey(full_name)')
+      .eq('status', 'active')
+      .is('final_completed_at', null)
       .order('created_at', { ascending: false });
     if (error) throw error;
 
