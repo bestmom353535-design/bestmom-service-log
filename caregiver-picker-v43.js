@@ -73,7 +73,7 @@
     const input = document.createElement('input');
     input.type = 'search';
     input.autocomplete = 'off';
-    input.placeholder = '관리사 이름 검색 (예: 황ㅅ, ㅎㅅㅇ)';
+    input.placeholder = '관리사 이름 검색 (예: 김영숙)';
     input.style.cssText = 'width:100%;';
 
     const selected = document.createElement('div');
