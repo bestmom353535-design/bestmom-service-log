@@ -349,23 +349,41 @@
       el('#cgScheduleClose').onclick = () => overlay.remove();
       overlay.onclick = (event) => { if (event.target===overlay) overlay.remove(); };
       el('#cgScheduleSave').onclick = async () => {
-        const changes = [...pending.entries()].map(([day,name]) =>
-          ({service_day:day,caregiver_name:name}));
-        if (!changes.length) return;
-        if (!window.confirm(`${changes.length}일의 제공인력을 저장할까요?\n기존 기록과 산모 서명은 변경되지 않습니다.`)) return;
+        if (!pending.size) return;
+        if (!window.confirm(`${pending.size}일의 제공인력을 저장할까요?\n기존 기록과 산모 서명은 변경되지 않습니다.`)) return;
         const btn=el('#cgScheduleSave');
         btn.disabled=true;
         try {
-          const {data,error} = await sb.rpc('admin_save_caregiver_day_assignments',{
-            p_case_id:caseId, p_changes:changes
-          });
-          if (error) throw error;
+          const standard=[];
+          const extras=[];
+          for (const [day,name] of pending) {
+            const row=rows.find(x=>x.day===day);
+            if (row?.missingId) {
+              if (!name) throw new Error('추가 근무일은 공란으로 만들 수 없습니다. 누락 근무일 삭제를 이용해주세요.');
+              extras.push({id:row.missingId,caregiver_name:name});
+            } else if (row?.originalDay!=null) {
+              standard.push({service_day:row.originalDay,caregiver_name:name,service_date:row.date});
+            }
+          }
+          if (standard.length) {
+            const {error}=await sb.rpc('admin_save_caregiver_day_assignments',{
+              p_case_id:caseId,p_changes:standard
+            });
+            if (error) throw error;
+          }
+          for (const item of extras) {
+            const {data,error}=await sb.from('caregiver_missing_days')
+              .update({caregiver_name:item.caregiver_name})
+              .eq('case_id',caseId).eq('id',item.id).select('id');
+            if (error) throw error;
+            if (!data?.length) throw new Error('수정 결과가 확인되지 않았습니다.');
+          }
           overlay.remove();
-          alert(`${Number(data)||changes.length}일의 근무인력을 저장했습니다. PDF에 반영됩니다.`);
+          alert('제공인력 변경사항을 저장했습니다. PDF에 반영됩니다.');
           await openEditor(caseId);
         } catch(err) {
           console.error('관리사 근무일 저장 실패',err);
-          alert(`저장하지 못했습니다: ${err?.message || err}`);
+          alert('저장하지 못했습니다: '+(err?.message||err));
           btn.disabled=false;
         }
       };
