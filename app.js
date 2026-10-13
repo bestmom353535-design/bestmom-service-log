@@ -114,7 +114,7 @@ async function adminCaregivers() {
       <div class="card">
         <h3>관리사 등록</h3>
         <div class="grid3">
-          <div><label>이름</label><input id="cgName" autocomplete="off"></div>
+          <div><label>이름</label><input id="cgName" autocomplete="off" placeholder="예: 김영숙"></div>
           <div><label>로그인 아이디</label><input id="cgId" placeholder="영문/숫자 3자 이상" autocapitalize="none" autocomplete="off"></div>
           <div><label>초기 비밀번호</label><input id="cgPw" type="password" placeholder="8자 이상" autocomplete="new-password"></div>
         </div>
