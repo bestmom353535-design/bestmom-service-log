@@ -314,6 +314,27 @@
         console.error('종료 서비스 기록 수 확인 오류', recordsError);
       }
     }
+    // 관리사가 직접 최종 제출한 건과 사무실에서 완료 처리한 건을 구별한다.
+    // DB의 기록감사 이력은 최종 제출 RPC와 같은 트랜잭션에 저장된다.
+    const lastFinishEvent = new Map();
+    if (ended.length) {
+      const endedIds = ended.map((item) => item.id);
+      const { data: finishEvents, error: finishError } = await sb
+        .from('record_audit')
+        .select('case_id,action,created_at')
+        .in('case_id', endedIds)
+        .in('action', ['service_completed', 'service_stopped', 'admin_service_completed', 'admin_service_stopped'])
+        .order('created_at', { ascending: false })
+        .limit(1000);
+      if (finishError) {
+        console.warn('최종 전송 이력을 확인하지 못했습니다.', finishError);
+      } else {
+        (finishEvents || []).forEach((event) => {
+          if (!lastFinishEvent.has(event.case_id)) lastFinishEvent.set(event.case_id, event);
+        });
+      }
+    }
+
     if (!ended.length) {
       main().innerHTML = `
         <div class="card">
@@ -339,6 +360,8 @@
         ${items.map((c) => {
           const written = recordCounts[c.id] || 0;
           const recordComplete = written >= Number(c.service_days || 0);
+          const completedEvent = lastFinishEvent.get(c.id);
+          const caregiverTransmitted = c.status === 'completed' && completedEvent?.action === 'service_completed';
           return `
           <div class="case" data-ended-case="${c.id}">
             <div class="row space">
@@ -349,8 +372,9 @@
               </div>
               <div style="text-align:right;white-space:nowrap">
                 <div style="font-size:13px;font-weight:800;color:${c.status === 'completed' ? '#166534' : '#92400e'}">
-                  ${c.status === 'completed' ? '서비스 완료 ✓' : '중도 종료 ✓'}
+                  ${caregiverTransmitted ? '관리사 최종 전송 완료 ✓' : (c.status === 'completed' ? '서비스 완료 ✓' : '중도 종료 ✓')}
                 </div>
+                ${caregiverTransmitted ? `<div class="muted tiny" style="margin-top:3px">전송일 ${escapeHtml(dateLabel(completedEvent.created_at))}</div>` : ''}
                 <div style="margin-top:6px;display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:900;background:${recordComplete ? '#dcfce7' : '#fee2e2'};color:${recordComplete ? '#166534' : '#991b1b'};border:1px solid ${recordComplete ? '#86efac' : '#fca5a5'}">
                   ${recordComplete ? '기록완료' : '미완성'} · ${written}/${c.service_days}일
                 </div>
