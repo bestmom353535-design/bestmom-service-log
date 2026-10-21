@@ -65,7 +65,7 @@
   function drawInfant(ctx,baby,xIndex,index){
     const start=X[xIndex], second=index===2;
     if(baby.baby_temp!==null&&baby.baby_temp!==undefined)
-      text(ctx,baby.baby_temp,start+53,second?569.4:385.9,8.5,25);
+      text(ctx,baby.baby_temp,start+43,second?569.4:385.9,8,23);
     maybeCheck(ctx,baby.sleep_status,['잘잠','잘못잠'],start+4.5,
       second?[595.5,605.9]:[412,422.7]);
     text(ctx,baby.breastfeed_count,start+51,second?626.5:443.1,8,19);
@@ -134,11 +134,11 @@
     if(!ctx)throw new Error('PDF 그림판을 시작할 수 없습니다.');
     ctx.scale(S,S);
     text(ctx,caseData.mother_name,171,76,10,82);
-    whiteText(ctx,dateShort(caseData.mother_birth_date),331,76,9,82,81,22);
+    whiteText(ctx,String(caseData.mother_birth_date||'').replace(/-/g,'.'),323,76,8,85,88,19);
     maybeCheck(ctx,caseData.delivery_type,['자연분만','제왕절개'],453,[73,85]);
     text(ctx,named(caseData,1),171,102.7,8,70);
     text(ctx,named(caseData,2),171,116.8,8,70);
-    whiteText(ctx,dateShort(caseData.baby_birth_date),329,106,9,82,82,25);
+    whiteText(ctx,String(caseData.baby_birth_date||'').replace(/-/g,'.'),323,106,8,85,88,19);
     text(ctx,caseData.birth_weight,512,100,8.2,27);
     text(ctx,caseData.baby2_birth_weight,512,114,8.2,27);
     const changesOnPage=timeline.changes.filter(c=>Math.floor((c.service_day-1)/5)===pageIndex);
@@ -150,7 +150,7 @@
 
     for(const row of rows.filter(r=>Math.floor((r.service_day-1)/5)===pageIndex)){
       const col=(row.service_day-1)%5,start=X[col];
-      whiteText(ctx,dateShort(row.service_date),start+36.5,176.3,8.3,67,68,16);
+      whiteText(ctx,dateShort(row.service_date),start+38.4,176.3,8.3,70,76,15);
       if(!row.is_missing_day) {
         drawMother(ctx,row,col);
         drawInfant(ctx,rowForBaby(row,1),col,1);
