@@ -35,11 +35,6 @@
     const newbornTitle=titles.find(el=>el.textContent.includes('신생아 상태'));
     if (newbornTitle) newbornTitle.textContent='신생아 1 · '+babyName(currentCase,true)+' (⑥~⑪)';
 
-    const baby1Color = document.createElement('div');
-    baby1Color.innerHTML=`<label for="baby1StoolColor">⑩ 신생아 1 배변 색깔·특징 (선택)</label>
-      <input id="baby1StoolColor" type="text" maxlength="80" value="${escapeHtml(record.twin_baby1_stool_color || '')}" ${disabled?'disabled':''}>`;
-    notesArea.insertAdjacentElement('beforebegin',baby1Color);
-
     const area=document.createElement('div');
     area.dataset.twinInfants='1';
     area.innerHTML=`
@@ -56,8 +51,6 @@
       </div>
       <p><b>⑩ 배변양상</b></p>
       ${choiceGroup('twin2Stool',['정상변','이상변'],saved.stool_status,false,disabled)}
-      <div><label for="twin2StoolColor">⑩ 배변 색깔·특징 (선택)</label>
-        <input id="twin2StoolColor" maxlength="80" value="${escapeHtml(saved.stool_color || '')}" ${disabled?'disabled':''}></div>
       <p><b>⑪ 목욕·제대관리</b></p>
       ${choiceGroup('twin2Bath',['실시','미실시'],saved.bath_cord_status,false,disabled)}
     `;
