@@ -22,15 +22,31 @@
       '" type="number" inputmode="decimal" step="'+step+'" value="'+esc(v??'')+
       '" '+(disabled?'disabled':'')+'></div>';
   }
-  function colorBox(number,name) {
+  function colorBox(number,name,isCaregiver,existingName) {
     const first=number===1;
     const bg=first?'#dbeafe':'#ffedd5';
     const color=first?'#1d4ed8':'#c2410c';
     const border=first?'#93c5fd':'#fdba74';
-    return '<span style="background:'+bg+';color:'+color+
-      ';border:2px solid '+border+
-      ';border-radius:9px;padding:8px 11px;font-size:14px;font-weight:900;">신생아 '+
+    const entry='<span style="font-size:14px;font-weight:900;color:'+color+'">신생아 '+
       number+' · '+esc(name)+'</span>';
+    const button=isCaregiver ?
+      '<button type="button" data-twin-edit="'+number+'" class="secondary" '+
+      'style="min-height:32px;padding:5px 10px;border:1px solid '+border+
+      ';border-radius:7px;font-size:12px;font-weight:800;">수정</button>' : '';
+    const editForm=isCaregiver ?
+      '<div data-twin-form="'+number+'" style="display:none;margin-top:10px;">'+
+      '<label for="twinNameInput'+number+'" style="font-weight:700;font-size:12px;">신생아 '+number+' 이름</label>'+
+      '<input id="twinNameInput'+number+'" data-twin-input="'+number+'" type="text" '+
+      'maxlength="30" autocomplete="off" placeholder="이름 입력" value="'+esc(existingName)+'">'+
+      '<div style="display:flex;gap:7px;margin-top:7px;">'+
+      '<button type="button" data-twin-save="'+number+'" class="primary" '+
+      'style="width:auto;padding:6px 13px;min-height:34px;">저장</button>'+
+      '<button type="button" data-twin-cancel="'+number+'" class="secondary" '+
+      'style="width:auto;padding:6px 13px;min-height:34px;">취소</button></div></div>' : '';
+    return '<div data-twin-entry="'+number+'" style="background:'+bg+';border:2px solid '+
+      border+';border-radius:10px;padding:9px 11px;min-width:200px;flex:1 1 190px;">'+
+      '<div style="display:flex;gap:9px;align-items:center;justify-content:space-between;flex-wrap:wrap;">'+
+      entry+button+'</div>'+editForm+'</div>';
   }
   function decorateOverview() {
     const data=twin();
@@ -39,11 +55,60 @@
     if(!main?.querySelector('.record-button'))return;
     const head=main.querySelector(':scope > .card > .row.space');
     if(!head||head.querySelector('[data-twin-overview]'))return;
+    const isCaregiver=typeof me!=='undefined'&&me?.role==='caregiver';
     const box=document.createElement('div');
     box.dataset.twinOverview='1';
     box.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;width:100%;';
-    box.innerHTML=colorBox(1,nameOf(data,1))+colorBox(2,nameOf(data,2));
+    box.innerHTML=colorBox(1,nameOf(data,1),isCaregiver,data.baby_name||'')+
+      colorBox(2,nameOf(data,2),isCaregiver,data.baby2_name||'');
     head.appendChild(box);
+    if(!isCaregiver)return;
+
+    const toggle=(number,opened)=>{
+      const form=box.querySelector('[data-twin-form="'+number+'"]');
+      if(!form)return;
+      form.style.display=opened?'block':'none';
+      if(opened)form.querySelector('input')?.focus();
+    };
+    box.querySelectorAll('[data-twin-edit]').forEach(button=>{
+      button.onclick=()=>toggle(Number(button.dataset.twinEdit),true);
+    });
+    box.querySelectorAll('[data-twin-cancel]').forEach(button=>{
+      button.onclick=()=>toggle(Number(button.dataset.twinCancel),false);
+    });
+    box.querySelectorAll('[data-twin-save]').forEach(button=>{
+      button.onclick=async()=>{
+        const number=Number(button.dataset.twinSave);
+        const input=box.querySelector('[data-twin-input="'+number+'"]');
+        const value=input?.value.trim()||'';
+        if(!value||value.length>30){
+          alertMsg('아기 이름을 1~30자 이내로 입력해주세요.');
+          input?.focus();
+          return;
+        }
+        const original=number===1?data.baby_name:data.baby2_name;
+        if(value===String(original||'').trim()){
+          toggle(number,false);
+          return;
+        }
+        button.disabled=true;
+        try{
+          const {data:savedName,error}=await sb.rpc('caregiver_update_twin_baby_name',{
+            p_case_id:data.id,p_baby_number:number,p_baby_name:value
+          });
+          if(error)throw error;
+          if(savedName!==value)throw new Error('저장한 이름이 확인되지 않았습니다.');
+          // 아기 이름만 저장한 뒤 최신 서비스 정보로 화면을 다시 불러온다.
+          alertMsg('신생아 '+number+' 이름을 저장했습니다.');
+          await window.openCase(data.id,false);
+        }catch(err){
+          console.error('쌍생아 이름 수정 실패',err);
+          alertMsg('이름 저장 실패: '+(err?.message||'알 수 없는 오류'));
+        }finally{
+          if(document.body.contains(button))button.disabled=false;
+        }
+      };
+    });
   }
   function decorateDay() {
     const data=twin();
