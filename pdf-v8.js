@@ -678,6 +678,14 @@
       if (caseRes.error) throw caseRes.error;
       const caseData = caseRes.data;
 
+      // 쌍생아는 제공기록지 표 자체가 다르므로 전용 출력 엔진으로 분리한다.
+      // 단태아는 아래 기존 PDF-8 생성 코드를 수정 없이 계속 사용한다.
+      if (Number(caseData.baby_count) === 2) {
+        if (typeof window.makeTwinPdf !== 'function')
+          throw new Error('쌍생아 PDF 엔진을 불러오지 못했습니다. 새로고침해주세요.');
+        return await window.makeTwinPdf(caseData, preview);
+      }
+
       currentStage = '기록 불러오기';
       stage(currentStage);
       const recRes = await sb
