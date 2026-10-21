@@ -535,28 +535,36 @@ function clearSignature() {
 
 async function templatePage() {
   const { data, error } = await sb.storage.from('pdf-templates').list('');
-  const exists = !error && (data || []).some((x) => x.name === 'bestmom_blank_template.pdf');
+  const files = !error ? (data || []) : [];
+  const exists = files.some((x) => x.name === 'bestmom_blank_template.pdf');
+  const twinExists = files.some((x) => x.name === 'bestmom_twin_template.pdf');
   main().innerHTML = `
     <div class="card">
-      <h3>제공기록지 원본 PDF</h3>
+      <h3>제공기록지 원본 PDF · 단태아</h3>
       <p>현재 상태: <b>${exists ? '등록됨' : '미등록'}</b></p>
-      <div class="notice">처음 한 번만 빈 제공기록지 PDF를 등록하면 됩니다.</div>
+      <div class="notice">기존 단태아 원본 PDF입니다. 쌍생아 등록 시 변경할 필요 없습니다.</div>
       <input id="tpl" type="file" accept="application/pdf" class="mt">
-      <button id="upload" class="primary mt">원본 PDF 등록</button>
+      <button id="upload" class="primary mt">단태아 원본 등록</button>
+    </div>
+    <div class="card">
+      <h3>쌍생아 제공기록지 원본 PDF</h3>
+      <p>현재 상태: <b>${twinExists ? '등록됨' : '미등록'}</b></p>
+      <div class="notice">쌍생아용 5일짜리 PDF 원본을 등록하면 2주 2장, 3주 3장, 4주 4장으로 자동 출력됩니다.</div>
+      <input id="tplTwin" type="file" accept="application/pdf" class="mt">
+      <button id="uploadTwin" class="primary mt">쌍생아 원본 등록</button>
     </div>`;
 
-  $('upload').onclick = async () => {
-    const file = $('tpl').files[0];
-    if (!file) return alertMsg('PDF를 선택해주세요.');
-    const { error: uploadError } = await sb.storage
-      .from('pdf-templates')
-      .upload('bestmom_blank_template.pdf', file, { upsert: true, contentType: 'application/pdf' });
-    if (uploadError) alertMsg(uploadError.message);
-    else {
-      alertMsg('등록했습니다.');
-      await templatePage();
-    }
-  };
+  async function uploadTemplate(inputId,path) {
+    const file=$(inputId)?.files?.[0];
+    if(!file)return alertMsg('PDF 파일을 선택해주세요.');
+    if(file.type && file.type !== 'application/pdf')return alertMsg('PDF 파일만 등록할 수 있습니다.');
+    const { error: uploadError } = await sb.storage.from('pdf-templates')
+      .upload(path,file,{upsert:true,contentType:'application/pdf'});
+    if(uploadError)alertMsg(uploadError.message);
+    else {alertMsg('PDF 원본을 등록했습니다.');await templatePage();}
+  }
+  $('upload').onclick=()=>uploadTemplate('tpl','bestmom_blank_template.pdf');
+  $('uploadTwin').onclick=()=>uploadTemplate('tplTwin','bestmom_twin_template.pdf');
 }
 
 $('loginBtn').onclick = login;
