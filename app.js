@@ -220,12 +220,18 @@ async function adminCases() {
           <div><label id="baby1NameLabel">신생아명</label><input id="bName"></div>
           <div><label id="sharedBirthLabel">신생아 출생일</label><input id="bBirth" type="date"></div>
           <div><label id="baby1WeightLabel">출생체중(kg)</label><input id="weight" type="number" step="0.01" inputmode="decimal"></div>
-          <div data-twin-register style="display:none"><label>둘째 아기 이름</label><input id="bName2"></div>
-          <div data-twin-register style="display:none"><label>둘째 출생체중(kg)</label><input id="weight2" type="number" step="0.01" inputmode="decimal"></div>
           <div><label>관리사</label><select id="caseCg"><option value="">미지정</option>${caregivers.filter((x) => x.active).map((x) => `<option value="${x.id}">${escapeHtml(x.full_name)}</option>`).join('')}</select></div>
           <div><label>서비스 일수</label><select id="days"><option>10</option><option>15</option><option>20</option></select></div>
           <div><label>시작일</label><input id="start" type="date"></div>
         </div>
+        <section id="registerTwinBabyTwo" style="display:none;background:#fff7ed;border:2px solid #ea580c;border-radius:12px;padding:14px;margin-top:14px;">
+          <div style="background:#c2410c;color:white;padding:10px 12px;border-radius:8px;font-size:16px;font-weight:800;margin-bottom:12px">신생아 2 · 둘째 아기 정보</div>
+          <div class="grid">
+            <div><label for="bName2">둘째 아기 이름</label><input id="bName2" autocomplete="off" placeholder="둘째 이름 입력"></div>
+            <div><label for="weight2">둘째 출생체중(kg)</label><input id="weight2" type="number" step="0.01" inputmode="decimal" placeholder="예: 2.5"></div>
+          </div>
+          <div class="muted tiny mt">출생일은 위의 '두 아기 공통 출생일'에 한 번만 입력하면 됩니다.</div>
+        </section>
         <button id="addCase" class="primary mt">서비스 등록</button>
       </div>
       <div class="card">
@@ -245,7 +251,9 @@ async function adminCases() {
 
     const updateBabyType = () => {
       const twin = $('babyCount')?.value === '2';
-      document.querySelectorAll('[data-twin-register]').forEach(el => { el.style.display = twin ? '' : 'none'; });
+      // 둘째 정보는 등록 영역 아래에 크게 분리해 숨겨지는 문제를 방지한다.
+      const secondBox = document.getElementById('registerTwinBabyTwo');
+      if (secondBox) secondBox.style.display = twin ? 'block' : 'none';
       $('baby1NameLabel').textContent = twin ? '첫째 아기 이름' : '신생아명';
       $('baby1WeightLabel').textContent = twin ? '첫째 출생체중(kg)' : '출생체중(kg)';
       $('sharedBirthLabel').textContent = twin ? '두 아기 공통 출생일' : '신생아 출생일';
@@ -255,7 +263,8 @@ async function adminCases() {
       });
       if (twin && Number(days.value) === 5) days.value = '10';
     };
-    $('babyCount').onchange = updateBabyType;
+    $('babyCount').addEventListener('change', updateBabyType);
+    $('babyCount').addEventListener('input', updateBabyType);
     updateBabyType();
 
     $('addCase').onclick = async () => {
