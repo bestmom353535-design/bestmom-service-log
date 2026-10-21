@@ -69,7 +69,12 @@
           <div class="case row space">
             <div>
               <b>${escapeHtml(c.mother_name)}</b>
-              <div class="muted">${escapeHtml(c.baby_name || '')} · ${c.service_days}일</div>
+              <div class="muted">${Number(c.baby_count)===2 ? '쌍생아 · ' : escapeHtml(c.baby_name || '')+' · '}${c.service_days}일</div>
+              ${Number(c.baby_count)===2 ? `
+                <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:7px;font-size:12px;font-weight:900;">
+                  <span style="border:1px solid #93c5fd;background:#dbeafe;color:#1d4ed8;padding:5px 8px;border-radius:7px;">신생아 1 · ${escapeHtml(c.baby_name || '첫째 아기')}</span>
+                  <span style="border:1px solid #fdba74;background:#ffedd5;color:#c2410c;padding:5px 8px;border-radius:7px;">신생아 2 · ${escapeHtml(c.baby2_name || '둘째 아기')}</span>
+                </div>` : ''}
             </div>
             <button class="primary" onclick="openCase('${c.id}', false)">기록 입력</button>
           </div>`).join('') : '<p class="muted">진행 중인 서비스가 없습니다.</p>'}
