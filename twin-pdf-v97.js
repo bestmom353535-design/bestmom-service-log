@@ -58,7 +58,7 @@
       baby_temp:record.baby_temp,sleep_status:record.sleep_status,
       breastfeed_count:record.breastfeed_count,formula_count:record.formula_count,
       formula_ml:record.formula_ml,stool_status:record.stool_status,
-      stool_color:record.twin_baby1_stool_color,bath_cord_status:record.bath_cord_status
+      bath_cord_status:record.bath_cord_status
     };
     return record.twin_baby2||{};
   }
@@ -73,7 +73,6 @@
     text(ctx,baby.formula_ml,start+43,second?661.3:483.2,7.7,22);
     maybeCheck(ctx,baby.stool_status,['정상변','이상변'],start+4.5,
       second?[676.8,687.3]:[502.6,513.4]);
-    if(baby.stool_color)text(ctx,baby.stool_color,start+46,second?697.8:524.1,6.2,44);
     maybeCheck(ctx,baby.bath_cord_status,['실시','미실시'],start+4.5,
       second?[711.7,721.7]:[538.2,548.6]);
   }
