@@ -441,6 +441,27 @@ async function saveDay(day, adminMode, signing) {
     notes: $('notes').value.trim() || null
   };
 
+  // 쌍생아만 추가되는 입력 정보. 단태아 저장 데이터와 기존 처리 흐름은 그대로 유지.
+  if (Number(currentCase?.baby_count) === 2) {
+    const twinInput = (id) => document.getElementById(id);
+    const twinNum = (id) => {
+      const val = twinInput(id)?.value ?? '';
+      return val === '' ? null : Number(val);
+    };
+    const twinChoice = (name) => document.querySelector('input[name="'+name+'"]:checked')?.value || null;
+    payload.twin_baby1_stool_color = twinInput('baby1StoolColor')?.value.trim() || null;
+    payload.twin_baby2 = {
+      baby_temp: twinNum('twin2Temp'),
+      sleep_status: twinChoice('twin2Sleep'),
+      breastfeed_count: twinNum('twin2Bf'),
+      formula_count: twinNum('twin2Fc'),
+      formula_ml: twinNum('twin2Ml'),
+      stool_status: twinChoice('twin2Stool'),
+      stool_color: twinInput('twin2StoolColor')?.value.trim() || null,
+      bath_cord_status: twinChoice('twin2Bath')
+    };
+  }
+
   if (signing) {
     if (!signatureDirty) return alertMsg('산모님 서명을 먼저 해주세요.');
     payload.signature_data = $('sig').toDataURL('image/png');
