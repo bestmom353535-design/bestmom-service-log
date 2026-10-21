@@ -33,12 +33,27 @@
 
     const titles=[...dayArea.querySelectorAll('.section-title')];
     const newbornTitle=titles.find(el=>el.textContent.includes('신생아 상태'));
-    if (newbornTitle) newbornTitle.textContent='신생아 1 · '+babyName(currentCase,true)+' (⑥~⑪)';
+    if (!newbornTitle || newbornTitle.parentElement !== notesArea.parentElement) return;
 
-    const area=document.createElement('div');
+    // 첫째는 파란색, 둘째는 주황색: 색상만이 아니라 명확한 번호와 이름으로도 구분.
+    const firstPanel=document.createElement('section');
+    firstPanel.dataset.twinBabyOne='1';
+    firstPanel.style.cssText='margin:18px 0 14px;padding:14px;background:#eff6ff;border:2px solid #2563eb;border-radius:14px;';
+    newbornTitle.before(firstPanel);
+    let nextNode=newbornTitle;
+    while(nextNode && nextNode!==notesArea){
+      const following=nextNode.nextSibling;
+      firstPanel.appendChild(nextNode);
+      nextNode=following;
+    }
+    newbornTitle.textContent='신생아 1 · '+babyName(currentCase,true)+' (⑥~⑪)';
+    newbornTitle.style.cssText='background:#1d4ed8;color:#fff;padding:12px 14px;font-size:18px;font-weight:900;border-radius:9px;margin:0 0 14px;';
+
+    const area=document.createElement('section');
     area.dataset.twinInfants='1';
+    area.style.cssText='margin:18px 0 14px;padding:14px;background:#fff7ed;border:2px solid #ea580c;border-radius:14px;';
     area.innerHTML=`
-      <div class="section-title">신생아 2 · ${escapeHtml(babyName(currentCase,false))} (⑥~⑪)</div>
+      <div class="section-title" style="background:#c2410c;color:#fff;padding:12px 14px;font-size:18px;font-weight:900;border-radius:9px;margin:0 0 14px;">신생아 2 · ${escapeHtml(babyName(currentCase,false))} (⑥~⑪)</div>
       <div class="grid">
         ${numInput('twin2Temp','⑥ 체온(℃)',saved.baby_temp,disabled,'step="0.1"')}
         ${numInput('twin2Bf','⑧ 모유수유 횟수',saved.breastfeed_count,disabled,'step="1"')}
