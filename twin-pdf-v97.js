@@ -61,16 +61,18 @@
   }
   function drawInfant(ctx,baby,xIndex,index){
     const start=X[xIndex], second=index===2;
-    const y=second?183.5:0;
     if(baby.baby_temp!==null&&baby.baby_temp!==undefined)
-      text(ctx,baby.baby_temp,start+53,385.9+y,8.5,25);
-    maybeCheck(ctx,baby.sleep_status,['잘잠','잘못잠'],start+4.5,[412+y,422.7+y]);
-    text(ctx,baby.breastfeed_count,start+51,443.1+y,8,19);
-    text(ctx,baby.formula_count,start+52,470.2+y,8,18);
-    text(ctx,baby.formula_ml,start+43,483.2+y,7.7,22);
-    maybeCheck(ctx,baby.stool_status,['정상변','이상변'],start+4.5,[502.6+y,513.4+y]);
-    if(baby.stool_color)text(ctx,baby.stool_color,start+46,524.1+y,6.2,44);
-    maybeCheck(ctx,baby.bath_cord_status,['실시','미실시'],start+4.5,[538.2+y,548.6+y]);
+      text(ctx,baby.baby_temp,start+53,second?569.4:385.9,8.5,25);
+    maybeCheck(ctx,baby.sleep_status,['잘잠','잘못잠'],start+4.5,
+      second?[595.5,605.9]:[412,422.7]);
+    text(ctx,baby.breastfeed_count,start+51,second?626.5:443.1,8,19);
+    text(ctx,baby.formula_count,start+52,second?650:470.2,8,18);
+    text(ctx,baby.formula_ml,start+43,second?661.3:483.2,7.7,22);
+    maybeCheck(ctx,baby.stool_status,['정상변','이상변'],start+4.5,
+      second?[676.8,687.3]:[502.6,513.4]);
+    if(baby.stool_color)text(ctx,baby.stool_color,start+46,second?697.8:524.1,6.2,44);
+    maybeCheck(ctx,baby.bath_cord_status,['실시','미실시'],start+4.5,
+      second?[711.7,721.7]:[538.2,548.6]);
   }
   function drawMother(ctx,r,i){
     const x=X[i];
