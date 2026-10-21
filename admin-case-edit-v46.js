@@ -110,8 +110,6 @@
             <div><label id="editBaby1Label">신생아명</label><input id="editBabyName" value="${esc(serviceCase.baby_name || '')}"></div>
             <div><label id="editCommonBirthLabel">신생아 출생일</label><input id="editBabyBirth" type="date" value="${esc(serviceCase.baby_birth_date || '')}"></div>
             <div><label id="editBaby1WeightLabel">출생체중(kg)</label><input id="editBirthWeight" type="number" step="0.01" inputmode="decimal" value="${esc(serviceCase.birth_weight ?? '')}"></div>
-            <div data-twin-edit style="${Number(serviceCase.baby_count)===2?'':'display:none'}"><label>둘째 아기 이름</label><input id="editBaby2Name" value="${esc(serviceCase.baby2_name || '')}"></div>
-            <div data-twin-edit style="${Number(serviceCase.baby_count)===2?'':'display:none'}"><label>둘째 출생체중(kg)</label><input id="editBaby2Weight" type="number" step="0.01" inputmode="decimal" value="${esc(serviceCase.baby2_birth_weight ?? '')}"></div>
             <div><label>서비스 기간</label><select id="editServiceDays">
               <option value="5" ${Number(serviceCase.service_days) === 5 ? 'selected' : ''}>1주 (5일)</option>
               <option value="10" ${Number(serviceCase.service_days) === 10 ? 'selected' : ''}>2주 (10일)</option>
@@ -120,6 +118,14 @@
             </select></div>
             <div><label>서비스 시작일</label><input id="editStartDate" type="date" value="${esc(serviceCase.start_date || '')}"></div>
           </div>
+          <section id="editTwinBabyTwo" style="display:${Number(serviceCase.baby_count)===2?'block':'none'};background:#fff7ed;border:2px solid #ea580c;border-radius:12px;padding:14px;margin-top:14px">
+            <div style="background:#c2410c;color:white;padding:10px 12px;border-radius:8px;font-size:16px;font-weight:800;margin-bottom:12px">신생아 2 · 둘째 아기 정보</div>
+            <div class="grid">
+              <div><label for="editBaby2Name">둘째 아기 이름</label><input id="editBaby2Name" placeholder="둘째 이름 입력" value="${esc(serviceCase.baby2_name || '')}"></div>
+              <div><label for="editBaby2Weight">둘째 출생체중(kg)</label><input id="editBaby2Weight" type="number" step="0.01" inputmode="decimal" value="${esc(serviceCase.baby2_birth_weight ?? '')}"></div>
+            </div>
+            <div class="muted tiny mt">출생일은 위의 '두 아기 공통 출생일'에서 한 번만 수정하면 됩니다.</div>
+          </section>
 
           <div class="mt" style="position:relative">
             <label>배정 관리사</label>
@@ -167,7 +173,8 @@
 
       const updateEditBabyType = () => {
         const isTwin = document.getElementById('editBabyCount').value==='2';
-        overlay.querySelectorAll('[data-twin-edit]').forEach(el=>{el.style.display=isTwin?'':'none';});
+        const secondBox = document.getElementById('editTwinBabyTwo');
+        if (secondBox) secondBox.style.display = isTwin ? 'block' : 'none';
         document.getElementById('editBaby1Label').textContent=isTwin?'첫째 아기 이름':'신생아명';
         document.getElementById('editBaby1WeightLabel').textContent=isTwin?'첫째 출생체중(kg)':'출생체중(kg)';
         document.getElementById('editCommonBirthLabel').textContent=isTwin?'두 아기 공통 출생일':'신생아 출생일';
@@ -175,7 +182,8 @@
         [...days.options].forEach(option=>{if(option.value==='5')option.disabled=isTwin;});
         if(isTwin&&days.value==='5')days.value='10';
       };
-      document.getElementById('editBabyCount').onchange=updateEditBabyType;
+      document.getElementById('editBabyCount').addEventListener('change', updateEditBabyType);
+      document.getElementById('editBabyCount').addEventListener('input', updateEditBabyType);
       updateEditBabyType();
       const search = document.getElementById('editCaregiverSearch');
       const hiddenId = document.getElementById('editCaregiverId');
