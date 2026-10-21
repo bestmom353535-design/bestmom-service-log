@@ -449,7 +449,6 @@ async function saveDay(day, adminMode, signing) {
       return val === '' ? null : Number(val);
     };
     const twinChoice = (name) => document.querySelector('input[name="'+name+'"]:checked')?.value || null;
-    payload.twin_baby1_stool_color = twinInput('baby1StoolColor')?.value.trim() || null;
     payload.twin_baby2 = {
       baby_temp: twinNum('twin2Temp'),
       sleep_status: twinChoice('twin2Sleep'),
@@ -457,7 +456,6 @@ async function saveDay(day, adminMode, signing) {
       formula_count: twinNum('twin2Fc'),
       formula_ml: twinNum('twin2Ml'),
       stool_status: twinChoice('twin2Stool'),
-      stool_color: twinInput('twin2StoolColor')?.value.trim() || null,
       bath_cord_status: twinChoice('twin2Bath')
     };
   }
