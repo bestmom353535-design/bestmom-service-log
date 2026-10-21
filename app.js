@@ -216,9 +216,12 @@ async function adminCases() {
           <div><label>산모명</label><input id="mName"></div>
           <div><label>산모 생년월일</label><input id="mBirth" type="date"></div>
           <div><label>분만형태</label><select id="delivery"><option value="">선택</option><option>자연분만</option><option>제왕절개</option></select></div>
-          <div><label>신생아명</label><input id="bName"></div>
-          <div><label>신생아 출생일</label><input id="bBirth" type="date"></div>
-          <div><label>출생체중(kg)</label><input id="weight" type="number" step="0.01" inputmode="decimal"></div>
+          <div><label>신생아 유형</label><select id="babyCount"><option value="1" selected>단태아</option><option value="2">쌍생아</option></select></div>
+          <div><label id="baby1NameLabel">신생아명</label><input id="bName"></div>
+          <div><label id="sharedBirthLabel">신생아 출생일</label><input id="bBirth" type="date"></div>
+          <div><label id="baby1WeightLabel">출생체중(kg)</label><input id="weight" type="number" step="0.01" inputmode="decimal"></div>
+          <div data-twin-register style="display:none"><label>둘째 아기 이름</label><input id="bName2"></div>
+          <div data-twin-register style="display:none"><label>둘째 출생체중(kg)</label><input id="weight2" type="number" step="0.01" inputmode="decimal"></div>
           <div><label>관리사</label><select id="caseCg"><option value="">미지정</option>${caregivers.filter((x) => x.active).map((x) => `<option value="${x.id}">${escapeHtml(x.full_name)}</option>`).join('')}</select></div>
           <div><label>서비스 일수</label><select id="days"><option>10</option><option>15</option><option>20</option></select></div>
           <div><label>시작일</label><input id="start" type="date"></div>
@@ -230,7 +233,7 @@ async function adminCases() {
         ${(cases || []).length ? (cases || []).map((c) => `
           <div class="case">
             <div class="row space">
-              <div><b>${escapeHtml(c.mother_name)}</b><div class="muted">아기 ${escapeHtml(c.baby_name || '')} · 관리사 ${escapeHtml(c.caregiver?.full_name || c.caregiver_name_override || '미지정')} · ${c.service_days}일</div></div>
+              <div><b>${escapeHtml(c.mother_name)}</b><div class="muted">아기 ${escapeHtml(c.baby_name || '')}${Number(c.baby_count)===2 ? ' · 쌍생아' : ''} · 관리사 ${escapeHtml(c.caregiver?.full_name || c.caregiver_name_override || '미지정')} · ${c.service_days}일</div></div>
               <b>${counts[c.id] || 0}/${c.service_days}</b>
             </div>
             <div class="row mt">
@@ -240,8 +243,27 @@ async function adminCases() {
           </div>`).join('') : '<p class="muted">등록된 서비스가 없습니다.</p>'}
       </div>`;
 
+    const updateBabyType = () => {
+      const twin = $('babyCount')?.value === '2';
+      document.querySelectorAll('[data-twin-register]').forEach(el => { el.style.display = twin ? '' : 'none'; });
+      $('baby1NameLabel').textContent = twin ? '첫째 아기 이름' : '신생아명';
+      $('baby1WeightLabel').textContent = twin ? '첫째 출생체중(kg)' : '출생체중(kg)';
+      $('sharedBirthLabel').textContent = twin ? '두 아기 공통 출생일' : '신생아 출생일';
+      const days = $('days');
+      [...days.options].forEach(option => {
+        if (Number(option.value || option.textContent) === 5) option.disabled = twin;
+      });
+      if (twin && Number(days.value) === 5) days.value = '10';
+    };
+    $('babyCount').onchange = updateBabyType;
+    updateBabyType();
+
     $('addCase').onclick = async () => {
       if (!$('mName').value.trim()) return alertMsg('산모명을 입력해주세요.');
+      const twin = $('babyCount')?.value === '2';
+      if (twin && ![10,15,20].includes(Number($('days').value))) {
+        return alertMsg('쌍생아는 2주·3주·4주 중에서 선택해주세요.');
+      }
       const payload = {
         mother_name: $('mName').value.trim(),
         mother_birth_date: $('mBirth').value || null,
@@ -249,6 +271,9 @@ async function adminCases() {
         baby_name: $('bName').value.trim() || null,
         baby_birth_date: $('bBirth').value || null,
         birth_weight: $('weight').value || null,
+        baby_count: twin ? 2 : 1,
+        baby2_name: twin ? ($('bName2').value.trim() || null) : null,
+        baby2_birth_weight: twin ? ($('weight2').value || null) : null,
         caregiver_id: $('caseCg').value || null,
         caregiver_name_override: $('caseCg').value
           ? null
