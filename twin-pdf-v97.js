@@ -11,7 +11,10 @@
     if(v===null||v===undefined||v==='')return;
     ctx.save();ctx.textAlign=align;ctx.textBaseline='middle';
     ctx.font='600 '+size+'px '+family;ctx.fillStyle=color;
-    ctx.fillText(String(v),x,y,max);ctx.restore();
+    // 기존 PDF-8의 미결제사유 글자 보정이 이 캔버스 하단에도 적용되므로
+    // 쌍생아 특이사항의 좌표는 그만큼 역보정한다.
+    const adjustedY=(y>730&&y<790)?y+11.4:y;
+    ctx.fillText(String(v),x,adjustedY,max);ctx.restore();
   }
   function whiteText(ctx,v,x,y,size=8,max=74,width=58,height=14){
     ctx.fillStyle='#fff';ctx.fillRect(x-width/2,y-height/2,width,height);
@@ -44,7 +47,7 @@
     ctx.save();ctx.strokeStyle='#ed1c24';ctx.fillStyle='#ed1c24';ctx.lineWidth=1.15;
     ctx.beginPath();ctx.arc(cx,cy,7.1,0,Math.PI*2);ctx.stroke();
     ctx.font='bold 4.4px '+family;ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText('베스',cx,cy-2.2,12);ctx.fillText('트맘',cx,cy+2.2,12);
+    ctx.fillText('베스',cx,cy-2.2+11.4,12);ctx.fillText('트맘',cx,cy+2.2+11.4,12);
     ctx.restore();
   }
   function named(caseData,n){
