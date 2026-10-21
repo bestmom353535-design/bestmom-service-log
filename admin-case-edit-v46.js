@@ -103,9 +103,15 @@
               <option value="자연분만" ${serviceCase.delivery_type === '자연분만' ? 'selected' : ''}>자연분만</option>
               <option value="제왕절개" ${serviceCase.delivery_type === '제왕절개' ? 'selected' : ''}>제왕절개</option>
             </select></div>
-            <div><label>신생아명</label><input id="editBabyName" value="${esc(serviceCase.baby_name || '')}"></div>
-            <div><label>신생아 출생일</label><input id="editBabyBirth" type="date" value="${esc(serviceCase.baby_birth_date || '')}"></div>
-            <div><label>출생체중(kg)</label><input id="editBirthWeight" type="number" step="0.01" inputmode="decimal" value="${esc(serviceCase.birth_weight ?? '')}"></div>
+            <div><label>신생아 유형</label><select id="editBabyCount">
+              <option value="1" ${Number(serviceCase.baby_count)!==2?'selected':''}>단태아</option>
+              <option value="2" ${Number(serviceCase.baby_count)===2?'selected':''}>쌍생아</option>
+            </select></div>
+            <div><label id="editBaby1Label">신생아명</label><input id="editBabyName" value="${esc(serviceCase.baby_name || '')}"></div>
+            <div><label id="editCommonBirthLabel">신생아 출생일</label><input id="editBabyBirth" type="date" value="${esc(serviceCase.baby_birth_date || '')}"></div>
+            <div><label id="editBaby1WeightLabel">출생체중(kg)</label><input id="editBirthWeight" type="number" step="0.01" inputmode="decimal" value="${esc(serviceCase.birth_weight ?? '')}"></div>
+            <div data-twin-edit style="${Number(serviceCase.baby_count)===2?'':'display:none'}"><label>둘째 아기 이름</label><input id="editBaby2Name" value="${esc(serviceCase.baby2_name || '')}"></div>
+            <div data-twin-edit style="${Number(serviceCase.baby_count)===2?'':'display:none'}"><label>둘째 출생체중(kg)</label><input id="editBaby2Weight" type="number" step="0.01" inputmode="decimal" value="${esc(serviceCase.baby2_birth_weight ?? '')}"></div>
             <div><label>서비스 기간</label><select id="editServiceDays">
               <option value="5" ${Number(serviceCase.service_days) === 5 ? 'selected' : ''}>1주 (5일)</option>
               <option value="10" ${Number(serviceCase.service_days) === 10 ? 'selected' : ''}>2주 (10일)</option>
@@ -159,6 +165,18 @@
         </div>`;
       document.body.appendChild(overlay);
 
+      const updateEditBabyType = () => {
+        const isTwin = document.getElementById('editBabyCount').value==='2';
+        overlay.querySelectorAll('[data-twin-edit]').forEach(el=>{el.style.display=isTwin?'':'none';});
+        document.getElementById('editBaby1Label').textContent=isTwin?'첫째 아기 이름':'신생아명';
+        document.getElementById('editBaby1WeightLabel').textContent=isTwin?'첫째 출생체중(kg)':'출생체중(kg)';
+        document.getElementById('editCommonBirthLabel').textContent=isTwin?'두 아기 공통 출생일':'신생아 출생일';
+        const days=document.getElementById('editServiceDays');
+        [...days.options].forEach(option=>{if(option.value==='5')option.disabled=isTwin;});
+        if(isTwin&&days.value==='5')days.value='10';
+      };
+      document.getElementById('editBabyCount').onchange=updateEditBabyType;
+      updateEditBabyType();
       const search = document.getElementById('editCaregiverSearch');
       const hiddenId = document.getElementById('editCaregiverId');
       const selected = document.getElementById('editCaregiverSelected');
@@ -275,6 +293,11 @@
           baby_name: document.getElementById('editBabyName').value.trim() || null,
           baby_birth_date: document.getElementById('editBabyBirth').value || null,
           birth_weight: document.getElementById('editBirthWeight').value || null,
+          baby_count: Number(document.getElementById('editBabyCount').value),
+          baby2_name: document.getElementById('editBabyCount').value==='2'
+            ? (document.getElementById('editBaby2Name').value.trim() || null) : null,
+          baby2_birth_weight: document.getElementById('editBabyCount').value==='2'
+            ? (document.getElementById('editBaby2Weight').value || null) : null,
           service_days: Number(document.getElementById('editServiceDays').value),
           start_date: document.getElementById('editStartDate').value || null,
           caregiver_id: hiddenId.value || null,
@@ -289,6 +312,9 @@
           return alertMsg('관리사가 변경되는 날짜를 반드시 선택해주세요.');
         }
 
+        if (payload.baby_count===2 && ![10,15,20].includes(payload.service_days)) {
+          return alertMsg('쌍생아는 2주·3주·4주 중에서 선택해주세요.');
+        }
         if (![5, 10, 15, 20].includes(payload.service_days)) {
           return alertMsg('서비스 기간을 다시 선택해주세요.');
         }
