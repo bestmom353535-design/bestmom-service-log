@@ -7,7 +7,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>베스트맘 제공기록</title>
-  <link rel="stylesheet" href="style.css?v=20261023-app105">
+  <link rel="stylesheet" href="style.css?v=20261023-app106">
 </head>
 <body>
   <div id="loginView" class="wrap login">
@@ -23,7 +23,7 @@
       <div class="muted tiny">개인 휴대폰에서만 사용해주세요. 비밀번호 자체는 별도로 저장하지 않습니다.</div>
       <button id="loginBtn" class="primary full mt">로그인</button>
       <div id="loginMsg" class="muted mt">연결 확인 중...</div>
-      <div class="muted mt tiny">앱 버전 APP-105 · PDF-8</div>
+      <div class="muted mt tiny">앱 버전 APP-106 · PDF-8</div>
     </div>
   </div>
 
@@ -33,7 +33,7 @@
         <div class="brand">베스트맘 제공기록</div>
         <div id="who" class="muted"></div>
         <div id="runtimeStatus" class="muted tiny">PDF-8.0 엔진 · 준비 중</div>
-        <div class="muted tiny" style="margin-top:2px;">앱 버전 APP-105</div>
+        <div class="muted tiny" style="margin-top:2px;">앱 버전 APP-106</div>
       </div>
       <button id="logoutBtn" class="secondary">로그아웃</button>
     </div>
@@ -50,7 +50,7 @@
 
   <script>
   (() => {
-    const VER = '20261023-app105';
+    const VER = '20261023-app106';
     const PDF_ENGINE = 'PDF-8.0';
     const PROJECT_REF = 'chbxwvsetyvzhxdfmzdj';
     let lastError = '';
@@ -131,6 +131,21 @@
       );
     }
 
+    // 자동로그인 여부와 관계없이 동일 주소로 접속할 때 최신 HTML/JS/CSS 사용.
+    // 세션/로컬저장소는 수정하지 않고 페이지도 임의로 새로고침하지 않음.
+    async function enableMobileFreshUpdates() {
+      if (!('serviceWorker' in navigator) || !window.isSecureContext) return;
+      try {
+        const registration = await navigator.serviceWorker.register('./sw.js', {
+          scope: './', updateViaCache: 'none'
+        });
+        // GitHub Pages가 설치된 SW를 캐시한 경우에도 최신 코드 확인.
+        await registration.update();
+      } catch (error) {
+        console.warn('모바일 캐시 업데이트 기능을 시작하지 못했습니다.', error);
+      }
+    }
+
     // GitHub Pages / 모바일 인앱브라우저의 오래된 HTML 캐시를 우회해
     // 앱 시작 전 최신 배포 버전을 확인하고 필요할 때만 새 주소로 다시 불러온다.
     // 입력 중인 기록을 잃지 않도록 페이지 시작 시에만 확인한다.
@@ -160,6 +175,9 @@
     }
 
     async function startApp() {
+      // 처음 실행 시 서비스워커를 등록하고, 이후 새로고침부터 최신 파일 우선.
+      // 등록이 느리거나 지원되지 않아도 기존 자동로그인 실행을 막지 않음.
+      void enableMobileFreshUpdates();
       setMsg('최신 버전 확인 중...');
       if (await loadLatestVersionIfNeeded()) return;
       setMsg('연결 확인 중...');
