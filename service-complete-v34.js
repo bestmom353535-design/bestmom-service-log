@@ -8,20 +8,20 @@
       최종 전송 · 서비스 완료
     </button>
     <div class="notice" style="margin-top:8px;text-align:center;font-weight:800">
-      ⚠️ 서비스 마지막 근무일에만 눌러주세요.<br>
+      ⚠️ 서비스 마지막 제공일자에만 눌러주세요.<br>
       최종 제출 후에는 추가 기록을 입력할 수 없습니다.
     </div>`;
 
   const incompleteNoticeHtml = (savedDays, serviceDays) => `
     <div class="notice" data-final-submit-wait style="margin-top:16px;text-align:center">
-      <b>마지막 근무일입니다.</b><br>
+      <b>마지막 제공일자입니다.</b><br>
       전체 기록을 모두 저장한 뒤 최종 제출할 수 있습니다.<br>
       현재 ${savedDays}/${serviceDays}일 저장됨
     </div>`;
 
   async function finishService(caseId, button) {
     const ok = window.confirm(
-      '오늘이 이 서비스의 마지막 근무일이 맞습니까?\n\n모든 일차 기록과 산모 서명을 확인한 뒤 최종 전송해주세요.\n최종 전송 후 사무실에 완료 상태가 표시되며 내 서비스 목록에서는 사라집니다.'
+      '오늘이 이 서비스의 마지막 제공일자이 맞습니까?\n\n모든 일차 기록과 산모 서명을 확인한 뒤 최종 전송해주세요.\n최종 전송 후 사무실에 완료 상태가 표시되며 내 서비스 목록에서는 사라집니다.'
     );
     if (!ok) return;
 
