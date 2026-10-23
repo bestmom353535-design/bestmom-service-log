@@ -3,8 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>베스트맘 제공기록</title>
-  <link rel="stylesheet" href="style.css?v=20261023-app103">
+  <link rel="stylesheet" href="style.css?v=20261023-app104">
 </head>
 <body>
   <div id="loginView" class="wrap login">
@@ -20,7 +23,7 @@
       <div class="muted tiny">개인 휴대폰에서만 사용해주세요. 비밀번호 자체는 별도로 저장하지 않습니다.</div>
       <button id="loginBtn" class="primary full mt">로그인</button>
       <div id="loginMsg" class="muted mt">연결 확인 중...</div>
-      <div class="muted mt tiny">앱 버전 APP-103 · PDF-8</div>
+      <div class="muted mt tiny">앱 버전 APP-104 · PDF-8</div>
     </div>
   </div>
 
@@ -46,7 +49,7 @@
 
   <script>
   (() => {
-    const VER = '20261023-app103';
+    const VER = '20261023-app104';
     const PDF_ENGINE = 'PDF-8.0';
     const PROJECT_REF = 'chbxwvsetyvzhxdfmzdj';
     let lastError = '';
@@ -127,7 +130,37 @@
       );
     }
 
+    // GitHub Pages / 모바일 인앱브라우저의 오래된 HTML 캐시를 우회해
+    // 앱 시작 전 최신 배포 버전을 확인하고 필요할 때만 새 주소로 다시 불러온다.
+    // 입력 중인 기록을 잃지 않도록 페이지 시작 시에만 확인한다.
+    async function loadLatestVersionIfNeeded() {
+      try {
+        const check = new URL('./index.html', window.location.href);
+        check.searchParams.set('bestmom_version_check', String(Date.now()));
+        const response = await fetch(check.toString(), {
+          cache: 'no-store', credentials: 'same-origin'
+        });
+        if (!response.ok) return false;
+        const latestHtml = await response.text();
+        const match = latestHtml.match(/const VER = ['"]([0-9]{8}-app[0-9]+)['"]/);
+        if (!match) return false;
+        const currentNo = Number(VER.match(/app([0-9]+)/)?.[1] || 0);
+        const latestNo = Number(match[1].match(/app([0-9]+)/)?.[1] || 0);
+        if (latestNo <= currentNo) return false;
+        const reloadUrl = new URL(window.location.href);
+        reloadUrl.searchParams.set('v', match[1]);
+        reloadUrl.searchParams.set('fresh', String(Date.now()));
+        window.location.replace(reloadUrl.toString());
+        return true;
+      } catch (error) {
+        console.warn('최신 버전 확인 실패, 현재 파일로 계속 진행합니다.', error);
+        return false;
+      }
+    }
+
     async function startApp() {
+      setMsg('최신 버전 확인 중...');
+      if (await loadLatestVersionIfNeeded()) return;
       setMsg('연결 확인 중...');
       const supabaseOk = await loadWithFallback(
         'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.3/dist/umd/supabase.js',
