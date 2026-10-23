@@ -140,12 +140,18 @@
     const oldDate=typeof currentRecord==='undefined'?null:(currentRecord?.service_date||null);
     const recordId=typeof currentRecord==='undefined'?null:currentRecord?.id;
     const wasLocked=Boolean(typeof currentRecord!=='undefined'&&currentRecord?.locked);
-    if(recordId)input.disabled=false;
+    const ownsRecord=!recordId||!currentRecord?.created_by||currentRecord.created_by===me?.id;
+    if(recordId&&ownsRecord)input.disabled=false;
     const updateDisplay=()=>{formatted.textContent='서비스 날짜 · '+dayLabel(input.value);};
     input.addEventListener('input',updateDisplay);
     input.addEventListener('change',updateDisplay);
 
-    if(recordId){
+    if(recordId&&!ownsRecord){
+      const note=document.createElement('div');
+      note.style.cssText='font-size:12px;color:#92400e;margin-top:7px;';
+      note.textContent='다른 제공인력이 작성한 기록은 사무실에 날짜 수정을 요청해주세요.';
+      wrapper.appendChild(note);
+    }else if(recordId){
       const btn=document.createElement('button');
       btn.type='button';btn.className='secondary';
       btn.dataset.saveServiceDate='1';
@@ -165,7 +171,8 @@
         const notice=wasLocked
           ? day+'일차 서명완료 기록의 날짜를\n'+dayLabel(oldDate)+' → '+dayLabel(next)+
             '\n로 변경할까요?\n기존 서명과 기록내용은 그대로 유지됩니다.'
-          : day+'일차 근무 날짜를\n'+dayLabel(oldDate)+' → '+dayLabel(next)+'\n로 변경할까요?';
+          : day+'일차 근무 날짜를\n'+dayLabel(oldDate)+' → '+dayLabel(next)+
+            '\n로 변경할까요?\n다른 미저장 입력내용은 함께 저장되지 않습니다.';
         if(!window.confirm(notice))return;
         btn.disabled=true;
         try{
