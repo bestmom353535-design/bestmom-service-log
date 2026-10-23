@@ -7,8 +7,11 @@
   if(typeof oldOpenCase!=='function'||typeof oldOpenDay!=='function')return;
   const weekdays=['일','월','화','수','목','금','토'];
   const esc=s=>String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-  const validIso=s=>typeof s==='string' && /^\d{4}-\d{2}-\d{2}$/.test(s) &&
-    new Date(s+'T00:00:00Z').toISOString().slice(0,10)===s;
+  const validIso=s=>{
+    if(typeof s!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(s))return false;
+    const date=new Date(s+'T00:00:00Z');
+    return Number.isFinite(date.getTime()) && date.toISOString().slice(0,10)===s;
+  };
   const asUtc=s=>new Date(s+'T00:00:00Z');
   const dayLabel=s=>{
     if(!validIso(s))return '날짜 확인 필요';
