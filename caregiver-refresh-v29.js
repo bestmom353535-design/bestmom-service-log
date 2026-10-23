@@ -18,9 +18,12 @@
     }
 
     try {
-      if (typeof window.caregiverHome !== 'function') throw new Error('새로고침 기능을 불러오지 못했습니다.');
-      await window.caregiverHome();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      // 명단만 다시 그리던 기존 동작 대신 앱 전체를 다시 불러옵니다.
+      // 주소는 기존과 동일하며, 캐시 우회 파라미터만 내부적으로 추가합니다.
+      // 브라우저 자동로그인 세션 및 기록 데이터는 변경하지 않습니다.
+      const url = new URL(window.location.href);
+      url.searchParams.set('bestmom_fresh', String(Date.now()));
+      window.location.replace(url.toString());
     } catch (err) {
       console.error(err);
       alertMsg(`새로고침하지 못했습니다. ${err?.message || ''}`);
