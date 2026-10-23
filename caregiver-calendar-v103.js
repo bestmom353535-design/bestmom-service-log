@@ -43,7 +43,7 @@
     const daysByDate=new Map(records.map(r=>[r.service_date,r]));
     const lastDate=records.length?records[records.length-1].service_date:null;
     const today=(typeof todayKST==='function'?todayKST():new Date(Date.now()+9*3600000).toISOString().slice(0,10));
-    const monthBase=validIso(service.start_date)?service.start_date:(lastDate||today);
+    const monthBase=lastDate||(validIso(service.start_date)?service.start_date:today);
     let shown=monthParts(Number(monthBase.slice(0,4)),Number(monthBase.slice(5,7)));
 
     main.querySelector('[data-caregiver-calendar]')?.remove();
