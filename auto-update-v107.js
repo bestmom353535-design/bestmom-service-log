@@ -4,7 +4,7 @@
 
   // 모든 사용자(운영자 포함)의 기존 링크/자동로그인 상태에 적용.
   // 기록 작성 중인 화면을 강제로 닫거나 서명을 버리지 않도록 설계.
-  const currentVersion = '20261023-app107';
+  const currentVersion = String(window.BESTMOM_APP_VERSION || '20261023-app107');
   const currentNumber = Number(currentVersion.match(/app(\d+)/)?.[1] || 0);
   let checking = false, lastCheck = 0, pending = null, dirty = false, redirecting = false;
 
