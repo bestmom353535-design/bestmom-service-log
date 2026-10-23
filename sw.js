@@ -3,7 +3,7 @@
  * 기존 링크(루트/index.html) 및 인증 세션은 그대로 유지합니다.
  */
 'use strict';
-const WORKER_VERSION = '20261023-app106';
+const WORKER_VERSION = '20261023-app107';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(self.skipWaiting());
