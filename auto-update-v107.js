@@ -6,7 +6,7 @@
   // 기록 작성 중인 화면을 강제로 닫거나 서명을 버리지 않도록 설계.
   const currentVersion = '20261023-app107';
   const currentNumber = Number(currentVersion.match(/app(\d+)/)?.[1] || 0);
-  let checking = false, lastCheck = 0, pending = null, dirty = false;
+  let checking = false, lastCheck = 0, pending = null, dirty = false, redirecting = false;
 
   const safeToReload = () => {
     if (document.querySelector('#day > .card')) return false;
@@ -37,6 +37,8 @@
   }
 
   function redirectToFresh(version) {
+    if (redirecting) return;
+    redirecting = true;
     const next = new URL(window.location.href);
     next.searchParams.set('v', version);
     next.searchParams.set('bestmom_fresh', String(Date.now()));
