@@ -62,22 +62,34 @@
     '2026-12-25'
   ]);
 
+  const KOREA_PUBLIC_HOLIDAYS_2027 = new Set([
+    '2027-01-01', '2027-02-06', '2027-02-07', '2027-02-08', '2027-02-09',
+    '2027-03-01', '2027-05-01', '2027-05-03', '2027-05-05', '2027-05-13',
+    '2027-06-06', '2027-07-17', '2027-07-19', '2027-08-15', '2027-08-16',
+    '2027-09-14', '2027-09-15', '2027-09-16',
+    '2027-10-03', '2027-10-04', '2027-10-09', '2027-10-11',
+    '2027-12-25', '2027-12-27'
+  ]);
+
   function isServiceWorkday(date) {
     const day = date.getDay();
     if (day === 0 || day === 6) return false;
     const key = formatLocalDate(date);
     if (date.getFullYear() === 2026 && KOREA_PUBLIC_HOLIDAYS_2026.has(key)) return false;
+    if (date.getFullYear() === 2027 && KOREA_PUBLIC_HOLIDAYS_2027.has(key)) return false;
     return true;
   }
 
   function serviceDateFromFirst(firstServiceDate, serviceDay) {
     const date = parseLocalDate(firstServiceDate);
     if (!date || !Number.isFinite(Number(serviceDay)) || Number(serviceDay) < 1) return '';
+    if (date.getFullYear() < 2026 || date.getFullYear() > 2027) throw new Error('현재 자동 날짜 계산은 2026~2027년 공휴일 기준으로 지원됩니다.');
     if (Number(serviceDay) === 1) return formatLocalDate(date);
 
     let count = 1;
     while (count < Number(serviceDay)) {
       date.setDate(date.getDate() + 1);
+      if (date.getFullYear() > 2027) throw new Error('2028년 이후 공휴일이 아직 반영되지 않았습니다. 일정을 확인해주세요.');
       if (isServiceWorkday(date)) count += 1;
     }
     return formatLocalDate(date);
@@ -646,7 +658,7 @@
       const ok = window.confirm(
         '1일차 기록을 기준으로 나머지 빈 일차의 자동 초안을 만들까요?\n\n' +
         '기록 항목과 특이사항 문구를 일차별 초안으로 제안합니다. 특이사항은 관리사별 문체와 일차별 주제로 다르게 제안합니다. 실제 관찰 내용과 맞지 않는 문구는 저장 전 수정해주세요.\n' +
-        '날짜는 1일차 실제 서비스 날짜부터 주말과 2026년 공휴일을 제외해 이어집니다.\n' +
+        '날짜는 1일차 실제 서비스 날짜부터 주말과 2026~2027년 공휴일을 제외해 이어집니다.\n' +
         '자동 입력된 나머지 일차는 바로 저장됩니다. 특이사항은 제안 문구이므로 실제 제공내용과 일치하는지 확인하고, 맞지 않으면 반드시 수정해주세요.'
       );
       if (!ok) return;
@@ -734,7 +746,7 @@
           details: {
             saved_service_days: savedDays,
             first_service_date: firstServiceDate,
-            auto_date_rule: 'weekdays_excluding_2026_official_public_holidays',
+            auto_date_rule: 'weekdays_excluding_2026_2027_official_public_holidays',
             count: savedDays.length
           }
         });
