@@ -72,7 +72,7 @@
 
   function setFont(ctx, size, weight = 400) {
     ctx.font = `${weight} ${size}px ${fontFamily}`;
-    ctx.fillStyle = '#111';
+    ctx.fillStyle = '#484848';
   }
 
   function centerText(ctx, text, rect, size = 10.5, weight = 400) {
@@ -419,8 +419,8 @@
     const x = CHECK_X[col] + 3.1;
     const y = boxTop + 2.4;
     ctx.save();
-    ctx.strokeStyle = '#111';
-    ctx.lineWidth = 1.35;
+    ctx.strokeStyle = '#595959';
+    ctx.lineWidth = 1.05;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.beginPath();
