@@ -71,7 +71,7 @@
     const changed = updates.filter((row) => row.old_date !== row.new_date);
     const original = new Map(sorted.map((row) => [row.id, row]));
     const signedCount = changed.filter((row) =>
-      original.get(row.id)?.locked || Boolean(original.get(row.id)?.signature_data)
+      original.get(row.id)?.locked || Boolean(original.get(row.id)?.signed_at)
     ).length;
     const earlierDates = new Set(sorted
       .filter((row) => Number(row.service_day) < firstDay)
@@ -94,7 +94,7 @@
     button.disabled = true;
     try {
       const { data, error } = await sb.from('daily_records')
-        .select('id,service_day,service_date,locked,signature_data')
+        .select('id,service_day,service_date,locked,signed_at')
         .eq('case_id', caseId)
         .order('service_day', { ascending: true });
       if (error) throw error;
