@@ -32,7 +32,10 @@
 
     const counter = main.querySelector('[data-ended-search-count]');
     const empty = main.querySelector('[data-ended-search-empty]');
-    if (counter) counter.textContent = needle ? `검색 결과 ${shown}건` : '';
+    if (counter) {
+      const label = needle ? `검색 결과 ${shown}건` : '';
+      if (counter.textContent !== label) counter.textContent = label;
+    }
     if (empty) empty.style.display = needle && shown === 0 ? '' : 'none';
   }
 
@@ -105,7 +108,8 @@
   const start = () => {
     const main = document.getElementById('main');
     if (!main) return;
-    observer.observe(main, { childList: true, subtree: true });
+    // 종료 서비스 화면의 최상위 교체만 감지합니다. 검색 결과 문구를 감지하면 무한 반복됩니다.
+    observer.observe(main, { childList: true, subtree: false });
     attach();
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
