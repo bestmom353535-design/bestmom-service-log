@@ -221,11 +221,14 @@
     return Math.max(10, Math.round((n + deltas[randomInt(0, deltas.length - 1)]) / 10) * 10);
   }
 
-  function noteStyleFromFirst(firstNote, motherName = '') {
-    const text = String(firstNote || '').trim();
-    if (/습니다$|했습니다$|였습니다$|보였습니다$/.test(text)) return 'polite';
-    if (/다$|했다$|였다$|보였다$/.test(text)) return 'plain';
-    if (text) return 'memo';
+  // 실제 제공인력별로 같은 문체를 유지한다. 연령을 추정하지 않고 8가지 자연스러운 문체를 분산한다.
+  function noteStyleFromFirst(firstNote, motherName = '', caregiverKey = '') {
+    if (String(caregiverKey || '').trim()) return noteStyleForMother(motherName, caregiverKey);
+    const text = String(firstNote || '').trim().replace(/[.。]+$/, '');
+    if (/음$|함$/.test(text)) return 'memo';
+    if (/어요$|아요$/.test(text)) return 'casual';
+    if (/습니다$/.test(text)) return 'polite';
+    if (/다$/.test(text)) return 'plain';
     return noteStyleForMother(motherName);
   }
 
@@ -416,53 +419,65 @@
     ]
   };
 
-  function noteStyleForMother(motherName) {
-    const text = String(motherName || '').trim() || '산모';
-    let hash = 0;
-    for (const ch of text) hash = ((hash * 31) + ch.charCodeAt(0)) >>> 0;
-    return ['memo', 'polite', 'plain'][hash % 3];
+  function noteHash(value) {
+    let hash = 2166136261;
+    for (const ch of String(value || '')) {
+      hash ^= ch.charCodeAt(0);
+      hash = Math.imul(hash, 16777619) >>> 0;
+    }
+    return hash >>> 0;
+  }
+
+  function noteStyleForMother(motherName, caregiverKey = '') {
+    const key = String(caregiverKey || motherName || '기록').trim();
+    const voices = [
+      'memo', 'plain', 'polite', 'casual',
+      'memo-short', 'plain-short', 'polite-short', 'casual-short'
+    ];
+    return voices[noteHash(key) % voices.length];
   }
 
   function styleNote(note, style) {
-    if (style === 'memo') return note.replace(/습니다/g, '음');
-    if (style === 'plain') return note.replace(/습니다/g, '다');
-    return note;
+    const voice = String(style || 'polite');
+    const mode = voice.split('-')[0];
+    const short = voice.endsWith('-short');
+    let text = String(note || '').trim().replace(/[.。]+$/, '');
+    if (short) text = text.replace(/^오늘은\\s*/, '').replace(/^오늘\\s*/, '');
+    if (mode === 'memo') text = text.replace(/습니다$/, '음');
+    else if (mode === 'plain') text = text.replace(/습니다$/, '다');
+    else if (mode === 'casual') text = text.replace(/습니다$/, '어요');
+    return mode === 'memo' || short ? text : text + '.';
   }
 
-  function categoryOffset(motherName) {
-    const text = String(motherName || '').trim() || '산모';
-    let hash = 0;
-    for (const ch of text) hash = ((hash * 31) + ch.charCodeAt(0)) >>> 0;
-    return hash % Object.keys(NOTE_CATEGORIES).length;
+  function categoryOffset(motherName, caregiverKey = '') {
+    const person = String(caregiverKey || motherName || '기록');
+    return noteHash(person + '|' + String(motherName || '')) % Object.keys(NOTE_CATEGORIES).length;
   }
 
-  function variedNote(records = [], usedNotes = null, motherName = '', forcedStyle = null, serviceDay = 2) {
+  function variedNote(records = [], usedNotes = null, motherName = '', forcedStyle = null, serviceDay = 2, caregiverKey = '') {
     const used = new Set(
       (records || []).map((r) => String(r?.notes || '').trim()).filter(Boolean)
     );
     if (usedNotes) [...usedNotes].forEach((note) => used.add(String(note || '').trim()));
 
     const categories = Object.values(NOTE_CATEGORIES);
-    const offset = categoryOffset(motherName);
-    const preferred = ((Math.max(2, Number(serviceDay) || 2) - 2 + offset) % categories.length + categories.length) % categories.length;
+    const voice = forcedStyle || noteStyleForMother(motherName, caregiverKey);
+    const offset = categoryOffset(motherName, caregiverKey);
+    const day = Math.max(2, Number(serviceDay) || 2);
+    // 관리사·산모 조합에 따라 시작 주제를 바꾸고, 같은 케이스에서는 같은 문장 반복을 피한다.
+    const preferred = (day * 7 + offset) % categories.length;
     for (let step = 0; step < categories.length; step += 1) {
       const pool = categories[(preferred + step) % categories.length];
-      const available = pool.filter((note) => !used.has(note));
-      if (available.length) {
-        const note = available[Math.floor(Math.random() * available.length)];
-        const style = forcedStyle || 'polite';
-        return styleNote(note, style);
+      const first = noteHash(String(caregiverKey || motherName) + '|' + day + '|' + step) % pool.length;
+      for (let position = 0; position < pool.length; position += 1) {
+        const note = styleNote(pool[(first + position) % pool.length], voice);
+        if (!used.has(note)) return note;
       }
     }
-    const fallback = Object.values(NOTE_CATEGORIES).flat().filter((note) => !used.has(note));
-    if (fallback.length) {
-      const note = fallback[Math.floor(Math.random() * fallback.length)];
-      return styleNote(note, forcedStyle || 'polite');
-    }
-    return styleNote('오늘은 아기 상태를 확인하며 돌봄을 제공했습니다', forcedStyle || 'polite');
+    return styleNote('아기 상태를 살피며 돌봄을 제공했습니다', voice);
   }
 
-  function buildFromPrevious(records, usedNotes = null, motherName = '', firstRecord = null, serviceDay = 2) {
+  function buildFromPrevious(records, usedNotes = null, motherName = '', firstRecord = null, serviceDay = 2, caregiverKey = '') {
     const recent = records.slice(0, 5);
     const baseline = firstRecord || recent[recent.length - 1] || recent[0] || {};
     const breastPicked = filledNumber(baseline.breastfeed_count)
@@ -504,7 +519,7 @@
       ? Number(baseline.formula_ml)
       : Number(pickActual(recent, 'formula_ml'));
 
-    const noteStyle = noteStyleFromFirst(firstRecord?.notes, motherName);
+    const noteStyle = noteStyleFromFirst(firstRecord?.notes, motherName, caregiverKey);
 
     return {
       incision_status: modeArray(recent.map((r) => r.incision_status), filledArray(baseline.incision_status) ? baseline.incision_status : ['이상없음']),
@@ -520,7 +535,7 @@
       formula_ml: formulaActive && Number.isFinite(mlBase) ? varyMl(mlBase) : null,
       stool_status: mode(recent.map((r) => r.stool_status), baseline.stool_status || '정상변'),
       bath_cord_status: mode(recent.map((r) => r.bath_cord_status), baseline.bath_cord_status || '실시'),
-      notes: variedNote(recent, usedNotes, motherName, noteStyle, serviceDay)
+      notes: variedNote(recent, usedNotes, motherName, noteStyle, serviceDay, caregiverKey)
     };
   }
 
@@ -608,16 +623,17 @@
           ? currentCase
           : null;
 
-      if (!serviceMeta?.service_days) {
+      if (!serviceMeta?.service_days || (!serviceMeta?.caregiver_id && !serviceMeta?.caregiver_name_override && !serviceMeta?.caregiver?.full_name)) {
         const { data: serviceCase, error: caseError } = await sb
           .from('service_cases')
-          .select('service_days,mother_name')
+          .select('service_days,mother_name,caregiver_id,caregiver_name_override,caregiver:profiles!service_cases_caregiver_id_fkey(full_name)')
           .eq('id', caseId)
           .single();
         if (caseError) throw caseError;
         serviceMeta = { ...(serviceMeta || {}), ...(serviceCase || {}) };
       }
 
+      const caregiverVoiceKey = String(serviceMeta?.caregiver_id || serviceMeta?.caregiver?.full_name || serviceMeta?.caregiver_name_override || '').trim();
       const actual = rows || [];
       const byDay = new Map(actual.map((row) => [Number(row.service_day), row]));
       const firstRecord = byDay.get(1);
@@ -629,7 +645,7 @@
 
       const ok = window.confirm(
         '1일차 기록을 기준으로 나머지 빈 일차의 자동 초안을 만들까요?\n\n' +
-        '기록 항목과 특이사항 문구를 일차별 초안으로 제안합니다. 특이사항은 제공된 주제별 문구에서 하루 한 건씩 순환 선택합니다. 실제 관찰 내용과 맞지 않는 문구는 저장 전 수정해주세요.\n' +
+        '기록 항목과 특이사항 문구를 일차별 초안으로 제안합니다. 특이사항은 관리사별 문체와 일차별 주제로 다르게 제안합니다. 실제 관찰 내용과 맞지 않는 문구는 저장 전 수정해주세요.\n' +
         '날짜는 1일차 실제 서비스 날짜부터 주말과 2026년 공휴일을 제외해 이어집니다.\n' +
         '자동 입력된 나머지 일차는 바로 저장됩니다. 특이사항은 제안 문구이므로 실제 제공내용과 일치하는지 확인하고, 맞지 않으면 반드시 수정해주세요.'
       );
@@ -658,7 +674,8 @@
           usedAutoNotes,
           serviceMeta?.mother_name || '',
           firstRecord,
-          day
+          day,
+          caregiverVoiceKey
         );
         if (generatedDraft.notes) usedAutoNotes.add(generatedDraft.notes);
 
@@ -762,7 +779,7 @@
     const help = document.createElement('div');
     help.className = 'muted tiny';
     help.style.marginTop = '6px';
-    help.textContent = '1일차를 저장한 뒤 사용합니다. 특이사항은 주제별 문구를 일차마다 하나씩 순환 제안합니다. 실제 제공내용과 맞는지 확인 후 수정해주세요.';
+    help.textContent = '1일차를 저장한 뒤 사용합니다. 특이사항은 배정된 관리사별 문체와 일차별 주제로 다르게 제안합니다. 실제 관찰·제공내용과 일치하는지 확인 후 수정해주세요.';
 
     wrap.append(button, help);
     row.insertAdjacentElement('afterend', wrap);
@@ -820,7 +837,8 @@
         null,
         currentCase?.mother_name || '',
         firstRecord,
-        Number(day)
+        Number(day),
+        String(currentCase?.caregiver_id || currentCase?.caregiver?.full_name || currentCase?.caregiver_name_override || '').trim()
       );
       applyDraft(draft);
       addDraftNotice('1일차 및 앞선 실제 기록 참고');
