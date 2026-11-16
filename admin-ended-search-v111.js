@@ -5,7 +5,7 @@
   let query = '';
   let restoreFocus = false;
 
-  const normalize = (value) => String(value || '').normalize('NFC').toLowerCase().replace(/\\s+/g, '');
+  const normalize = (value) => String(value || '').normalize('NFC').toLowerCase().replace(/\s+/g, '');
 
   function applySearch() {
     const main = document.getElementById('main');
