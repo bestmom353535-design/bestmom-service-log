@@ -442,7 +442,7 @@
     const mode = voice.split('-')[0];
     const short = voice.endsWith('-short');
     let text = String(note || '').trim().replace(/[.。]+$/, '');
-    if (short) text = text.replace(/^오늘은\\s*/, '').replace(/^오늘\\s*/, '');
+    if (short) text = text.replace(/^오늘은\s*/, '').replace(/^오늘\s*/, '');
     if (mode === 'memo') text = text.replace(/습니다$/, '음');
     else if (mode === 'plain') text = text.replace(/습니다$/, '다');
     else if (mode === 'casual') text = text.replace(/습니다$/, '어요');
