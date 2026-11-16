@@ -7,10 +7,10 @@
   const family='"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",Arial,sans-serif';
   function dateShort(s) { const m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m ? m[1].slice(2)+'.'+m[2]+'.'+m[3] : ''; }
   function stampDate(s){const m=String(s||'').match(/^\d{4}-(\d{2})-(\d{2})/);return m?Number(m[1])+'/'+Number(m[2]):'';}
-  function text(ctx,v,x,y,size=8,max=74,align='center',color='#111'){
+  function text(ctx,v,x,y,size=8,max=74,align='center',color='#484848'){
     if(v===null||v===undefined||v==='')return;
     ctx.save();ctx.textAlign=align;ctx.textBaseline='middle';
-    ctx.font='600 '+size+'px '+family;ctx.fillStyle=color;
+    ctx.font='400 '+size+'px '+family;ctx.fillStyle=color;
     // 기존 PDF-8의 미결제사유 글자 보정이 이 캔버스 하단에도 적용되므로
     // 쌍생아 특이사항의 좌표는 그만큼 역보정한다.
     const adjustedY=(y>730&&y<790)?y+11.4:y;
@@ -21,7 +21,7 @@
     text(ctx,v,x,y,size,max);
   }
   function check(ctx,x,y){
-    ctx.save();ctx.strokeStyle='#111';ctx.lineWidth=1.65;ctx.lineCap='round';ctx.beginPath();
+    ctx.save();ctx.strokeStyle='#595959';ctx.lineWidth=1.15;ctx.lineCap='round';ctx.beginPath();
     ctx.moveTo(x,y);ctx.lineTo(x+2.0,y+2.1);ctx.lineTo(x+6,y-3.3);ctx.stroke();ctx.restore();
   }
   function maybeCheck(ctx,value,choices,x,ys){
@@ -30,7 +30,7 @@
   }
   function noteLines(ctx,textValue,maxWidth=62,maxLines=4){
     const parts=String(textValue||'').split('\n');const lines=[];
-    ctx.font='600 6.7px '+family;
+    ctx.font='400 6.7px '+family;
     for(const part of parts){
       let line='';
       for(const ch of part){
