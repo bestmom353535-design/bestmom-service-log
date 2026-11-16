@@ -102,37 +102,28 @@
     if (button) button.onclick = () => changeServiceDate(day, currentRecord.id, button);
   }
 
-  function protectLockedAdminRecord() {
+  function showAdminSignedRecordGuide() {
     if (typeof me === 'undefined' || me?.role !== 'admin') return;
     if (!currentRecord?.id || !currentRecord?.locked) return;
 
     const dayCard = document.querySelector('#day > .card');
-    if (!dayCard) return;
+    if (!dayCard || dayCard.querySelector('[data-admin-signed-edit-guide]')) return;
 
-    dayCard.querySelectorAll('input, select, textarea').forEach((el) => {
-      if (el.id === 'adminServiceDateFix') return;
-      el.disabled = true;
-    });
-
-    const saveButton = document.getElementById('save');
-    if (saveButton) saveButton.style.display = 'none';
-
-    if (!dayCard.querySelector('[data-admin-locked-guide]')) {
-      const guide = document.createElement('div');
-      guide.dataset.adminLockedGuide = '1';
-      guide.className = 'muted tiny';
-      guide.style.margin = '8px 0 12px';
-      guide.textContent = '서명 완료 기록입니다. 날짜는 위에서 바로 수정할 수 있으며, 다른 내용을 바꾸려면 잠금해제 후 산모 서명을 다시 받아야 합니다.';
-      const dateFix = dayCard.querySelector('[data-admin-date-fix]');
-      dateFix?.insertAdjacentElement('afterend', guide);
-    }
+    const guide = document.createElement('div');
+    guide.dataset.adminSignedEditGuide = '1';
+    guide.className = 'muted tiny';
+    guide.style.margin = '8px 0 12px';
+    guide.textContent = '서명 완료 기록도 운영자는 바로 수정·저장할 수 있습니다. 기존 서명은 이전 확인 내역으로 보존되고, 수정한 항목은 별도 이력으로 남습니다. 수정한 내용은 산모님께 다시 확인받아주세요.';
+    const dateFix = dayCard.querySelector('[data-admin-date-fix]');
+    if (dateFix) dateFix.insertAdjacentElement('afterend', guide);
+    else dayCard.prepend(guide);
   }
 
   window.openDay = async function openDayWithAdminControls(day, adminMode) {
     await previousOpenDay(day, adminMode);
     if (!adminMode) return;
     addAdminDateCorrection(day);
-    protectLockedAdminRecord();
+    showAdminSignedRecordGuide();
   };
 
   async function stopService(caseId, motherName, button) {
