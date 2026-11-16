@@ -372,7 +372,7 @@ window.openDay = async (day, adminMode) => {
 
   dayEl.innerHTML = `
     <div class="card ${locked ? 'locked' : ''}">
-      <div class="row space"><h3>${day}일차 ${locked ? '· 서명완료' : ''}</h3>${adminMode && locked ? '<button id="unlock" class="danger">잠금해제</button>' : ''}</div>
+      <div class="row space"><h3>${day}일차 ${locked ? '· 서명완료' : ''}</h3></div>
       <label>서비스 날짜</label><input id="serviceDate" type="date" value="${record?.service_date || todayKST()}" ${disabled ? 'disabled' : ''}>
 
       <div class="section-title">산모 상태 · 관리 (①~⑤)</div>
@@ -400,20 +400,6 @@ window.openDay = async (day, adminMode) => {
     setupSignature();
     $('clear').onclick = clearSignature;
     $('sign').onclick = () => saveDay(day, false, true);
-  }
-  if ($('unlock')) {
-    $('unlock').onclick = async () => {
-      const { error } = await sb.from('daily_records').update({ locked: false }).eq('id', record.id);
-      if (error) return alertMsg(error.message);
-      await sb.from('record_audit').insert({
-        record_id: record.id,
-        case_id: currentCase.id,
-        actor_id: me.id,
-        action: 'admin_unlocked',
-        details: { service_day: day }
-      });
-      await window.openCase(currentCase.id, true);
-    };
   }
 };
 
@@ -484,15 +470,36 @@ async function saveDay(day, adminMode, signing) {
 
   if (result.error) return alertMsg(result.error.message);
 
-  await sb.from('record_audit').insert({
+  const editingSignedRecord = Boolean(adminMode && currentRecord?.id && currentRecord?.locked && !signing);
+  const changedFields = editingSignedRecord
+    ? Object.keys(payload).filter((field) =>
+        field !== 'case_id' &&
+        field !== 'service_day' &&
+        JSON.stringify(payload[field] ?? null) !== JSON.stringify(currentRecord[field] ?? null)
+      )
+    : [];
+
+  const auditResult = await sb.from('record_audit').insert({
     record_id: result.data.id,
     case_id: currentCase.id,
     actor_id: me.id,
-    action: signing ? 'signed_locked' : 'saved',
-    details: { service_day: day }
+    action: signing ? 'signed_locked' : (editingSignedRecord ? 'admin_signed_record_edited' : 'saved'),
+    details: editingSignedRecord
+      ? {
+          service_day: day,
+          changed_fields: changedFields,
+          original_signature_preserved: true,
+          original_locked_status_preserved: true,
+          changed_after_signature: changedFields.length > 0
+        }
+      : { service_day: day }
   });
-
-  alertMsg(signing ? '서명이 저장되고 기록이 잠겼습니다.' : '저장했습니다.');
+  if (auditResult.error) {
+    console.warn('제공기록 수정 이력 저장 실패', auditResult.error);
+    alertMsg('기록은 저장되었지만 변경 이력을 저장하지 못했습니다. 관리자에게 확인해주세요.');
+  } else {
+    alertMsg(signing ? '서명이 저장되고 기록이 잠겼습니다.' : '저장했습니다.');
+  }
   await window.openCase(currentCase.id, adminMode);
 }
 
