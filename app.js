@@ -380,7 +380,7 @@ window.openDay = async (day, adminMode) => {
       <p><b>② 유방상태</b></p>${choiceGroup('breast', ['울혈','통증','이상없음'], record?.breast_status, true, disabled)}
       <p><b>③ 배뇨/배변</b></p>${choiceGroup('urine', ['불편감','이상없음'], record?.urination_bowel_status, true, disabled)}
       <p><b>④ 좌욕</b></p>${choiceGroup('sitz', ['실시','미실시'], record?.sitz_bath, false, disabled)}
-      <div class="grid"><div><label>⑤ 식사 횟수</label><input id="meal" type="number" inputmode="numeric" value="${record?.meal_count ?? ''}" ${disabled ? 'disabled' : ''}></div><div><label>⑤ 간식 횟수</label><input id="snack" type="number" inputmode="numeric" value="${record?.snack_count ?? ''}" ${disabled ? 'disabled' : ''}></div></div>
+      <div class="grid"><div><label>⑤ 식사 횟수</label><input id="meal" type="number" inputmode="numeric" min="0" max="3" step="1" value="${record?.meal_count ?? ''}" ${disabled ? 'disabled' : ''}></div><div><label>⑤ 간식 횟수</label><input id="snack" type="number" inputmode="numeric" min="0" max="1" step="1" value="${record?.snack_count ?? ''}" ${disabled ? 'disabled' : ''}></div></div>
 
       <div class="section-title">신생아 상태 · 관리 (⑥~⑪)</div>
       <div class="grid"><div><label>⑥ 체온(℃)</label><input id="temp" type="number" inputmode="decimal" step="0.1" value="${record?.baby_temp ?? ''}" ${disabled ? 'disabled' : ''}></div><div><label>⑧ 모유수유 횟수</label><input id="bf" type="number" inputmode="numeric" value="${record?.breastfeed_count ?? ''}" ${disabled ? 'disabled' : ''}></div></div>
@@ -415,6 +415,23 @@ function numberValue(id) {
 }
 
 async function saveDay(day, adminMode, signing) {
+  // 근무시간(09~17시)에 실제 제공한 식사/간식 횟수만 입력합니다.
+  // 기존 기록의 수치를 임의로 1 또는 3으로 바꿔 저장하지 않습니다.
+  for (const { id, label, max } of [
+    { id: 'meal', label: '식사', max: 3 },
+    { id: 'snack', label: '간식', max: 1 }
+  ]) {
+    const field = $(id);
+    const raw = String(field?.value ?? '').trim();
+    if (!raw) continue;
+    const count = Number(raw);
+    if (!Number.isInteger(count) || count < 0 || count > max) {
+      alertMsg(`${label} 횟수는 0~${max}회만 입력할 수 있습니다. 실제 제공 횟수를 확인해주세요.`);
+      field?.focus();
+      field?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+  }
   const payload = {
     case_id: currentCase.id,
     service_day: day,
