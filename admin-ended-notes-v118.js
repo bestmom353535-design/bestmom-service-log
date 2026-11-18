@@ -38,11 +38,10 @@
     status.style.color = error ? '#b91c1c' : '#475569';
   }
 
-  async function saveNotes(record, card, reload) {
+  async function saveNotes(record, card, onSaved) {
     if (!isAdmin()) return;
     const input = card.querySelector('[data-ended-notes-editor]');
     const saveButton = card.querySelector('[data-ended-notes-save]');
-    const cancelButton = card.querySelector('[data-ended-notes-cancel]');
     if (!input || !saveButton) return;
 
     const newValue = input.value.trim() || null;
@@ -56,7 +55,6 @@
 
     input.disabled = true;
     saveButton.disabled = true;
-    if (cancelButton) cancelButton.disabled = true;
     statusFor(card, '저장 중...');
     try {
       const current = await sb.from('daily_records')
@@ -95,14 +93,13 @@
 
       record.notes = updated.data.notes;
       record.updated_at = updated.data.updated_at;
-      await reload();
-      const changed = openedModal?.querySelector(`[data-ended-notes-day="${record.service_day}"]`);
-      statusFor(changed, audit.error ? '특이사항 저장 완료 · 수정 이력 저장 실패(확인 필요)' : '수정한 특이사항이 저장되었습니다.', !!audit.error);
+      if (typeof onSaved === 'function') onSaved();
+      statusFor(card, audit.error ? '특이사항 저장 완료 · 수정 이력 저장 실패(확인 필요)' : '저장되었습니다.', !!audit.error);
     } catch (error) {
       statusFor(card, `수정하지 못했습니다: ${error.message || error}`, true);
+    } finally {
       input.disabled = false;
       saveButton.disabled = false;
-      if (cancelButton) cancelButton.disabled = false;
     }
   }
 
@@ -120,43 +117,21 @@
           <b style="font-size:15px">${Number(record.service_day)}일차 · ${esc(dateLabel(record.service_date))}</b>
           ${record.locked ? '<span class="muted tiny">서명 완료</span>' : ''}
         </div>
-        <div data-ended-notes-value style="white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7;margin-top:10px">${record.notes ? esc(record.notes) : '<span class="muted">입력된 특이사항 없음</span>'}</div>
-        <div data-ended-notes-editwrap hidden style="margin-top:10px">
-          <textarea data-ended-notes-editor style="width:100%;box-sizing:border-box;min-height:95px;resize:vertical;line-height:1.65"></textarea>
-          <div class="row mt" style="gap:8px;flex-wrap:wrap">
-            <button type="button" class="primary" data-ended-notes-save>저장</button>
-            <button type="button" class="secondary" data-ended-notes-cancel>취소</button>
-          </div>
+        <div class="row mt" style="align-items:flex-end;gap:8px;flex-wrap:wrap">
+          <textarea data-ended-notes-editor aria-label="${Number(record.service_day)}일차 특이사항" placeholder="입력된 특이사항 없음"
+            style="flex:1 1 420px;min-width:0;box-sizing:border-box;min-height:88px;resize:vertical;line-height:1.65">${esc(record.notes || '')}</textarea>
+          <button type="button" class="primary" data-ended-notes-save style="width:auto;min-width:64px;flex-shrink:0">저장</button>
         </div>
-        <div class="row mt" style="align-items:center;gap:10px;flex-wrap:wrap">
-          <button type="button" class="secondary" data-ended-notes-edit>특이사항 수정</button>
-          <span class="muted tiny" data-ended-notes-status role="status" style="flex:1"></span>
-        </div>
+        <div class="muted tiny" data-ended-notes-status role="status" style="margin-top:7px"></div>
       </section>`).join('');
 
     records.forEach(record => {
       const card = body.querySelector(`[data-ended-notes-day="${record.service_day}"]`);
       if (!card) return;
-      const editButton = card.querySelector('[data-ended-notes-edit]');
-      const editWrap = card.querySelector('[data-ended-notes-editwrap]');
-      const display = card.querySelector('[data-ended-notes-value]');
-      const textarea = card.querySelector('[data-ended-notes-editor]');
-      editButton.onclick = () => {
-        textarea.value = record.notes || '';
-        editWrap.hidden = false;
-        display.hidden = true;
-        editButton.hidden = true;
-        textarea.focus();
-        statusFor(card, '');
-      };
-      card.querySelector('[data-ended-notes-cancel]').onclick = () => {
-        editWrap.hidden = true;
-        display.hidden = false;
-        editButton.hidden = false;
-        statusFor(card, '');
-      };
-      card.querySelector('[data-ended-notes-save]').onclick =
-        () => saveNotes(record, card, () => loadNotes(caseId, motherName));
+      card.querySelector('[data-ended-notes-save]').onclick = () => saveNotes(record, card, () => {
+        const count = records.filter(r => Boolean((r.notes || '').trim())).length;
+        summary.textContent = `저장된 제공기록 ${records.length}일 · 특이사항 입력 ${count}일`;
+      });
     });
   }
 
