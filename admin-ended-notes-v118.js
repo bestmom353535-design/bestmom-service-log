@@ -16,7 +16,7 @@
     const m = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
     if (!m) return '날짜 미입력';
     const d = new Date(`${m[1]}-${m[2]}-${m[3]}T12:00:00+09:00`);
-    const dayName = ['일', '월', '화', '수', '목', '금', '토'][d.getUTCDay() === undefined ? 0 : (d.getUTCDay() + 1) % 7];
+    const dayName = ['일', '월', '화', '수', '목', '금', '토'][d.getUTCDay()];
     return `${Number(m[2])}/${Number(m[3])}(${dayName})`;
   }
 
