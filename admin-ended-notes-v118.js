@@ -50,6 +50,14 @@
       statusFor(card, '변경된 내용이 없습니다.');
       return;
     }
+    if (typeof window.bestmomNotesContentError === 'function') {
+      const issue = window.bestmomNotesContentError(newValue, record.breastfeed_count, record.formula_count);
+      if (issue) {
+        statusFor(card, issue, true);
+        input.focus();
+        return;
+      }
+    }
     if (!newValue && !window.confirm(`${record.service_day}일차 특이사항을 비우시겠습니까?`)) return;
     if (record.locked && !window.confirm('산모 서명이 완료된 기록입니다. 서명은 그대로 유지하고 특이사항만 수정하시겠습니까?')) return;
 
@@ -142,7 +150,7 @@
     const body = modal.querySelector('[data-ended-notes-body]');
     body.innerHTML = '<p class="muted">특이사항을 불러오는 중...</p>';
     const response = await sb.from('daily_records')
-      .select('id,case_id,service_day,service_date,notes,locked,updated_at')
+      .select('id,case_id,service_day,service_date,notes,locked,updated_at,breastfeed_count,formula_count')
       .eq('case_id', caseId)
       .order('service_day', {ascending:true});
     if (modal !== openedModal || !modal.isConnected) return;
