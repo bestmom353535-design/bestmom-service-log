@@ -426,9 +426,24 @@ async function saveDay(day, adminMode, signing) {
     if (!raw) continue;
     const count = Number(raw);
     if (!Number.isInteger(count) || count < 0 || count > max) {
+      // 수정 중 다른 항목을 저장하는 경우, 종전에 기록된 횟수는 강제로 바꾸지 않습니다.
+      const oldValue = currentRecord?.[id === 'meal' ? 'meal_count' : 'snack_count'];
+      if (currentRecord?.id && oldValue !== null && oldValue !== undefined && Number(oldValue) === count) continue;
       alertMsg(`${label} 횟수는 0~${max}회만 입력할 수 있습니다. 실제 제공 횟수를 확인해주세요.`);
       field?.focus();
       field?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+  }
+  // 새로 쓰거나 수정한 특이사항에만 주간 근무 및 수유방식 기준을 적용합니다.
+  // 과거에 서명 완료된 원문은 다른 항목 저장 시 자동 변경하지 않습니다.
+  const nextNotes = String($('notes')?.value || '').trim();
+  const savedNotes = String(currentRecord?.notes || '').trim();
+  if (nextNotes !== savedNotes && typeof window.bestmomNotesContentError === 'function') {
+    const issue = window.bestmomNotesContentError(nextNotes, numberValue('bf'), numberValue('fc'));
+    if (issue) {
+      alertMsg(issue);
+      $('notes')?.focus();
       return;
     }
   }
