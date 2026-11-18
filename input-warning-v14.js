@@ -24,8 +24,9 @@
     if (isBlank('temp')) missing.push('⑥ 체온');
     if (!hasChecked('sleep')) missing.push('⑦ 수면 양상');
     // ⑧ 모유수유 횟수는 완전분유 수유 가정을 고려해 비어 있어도 경고하지 않습니다.
+    // 모유수유만 기록한 산모에게 분유수유를 필수값처럼 요구하지 않습니다.
     if (isBlank('fc')) {
-      missing.push('⑨ 분유수유 횟수');
+      if (isBlank('bf')) missing.push('⑧·⑨ 수유 횟수');
     } else {
       const formulaCount = Number(document.getElementById('fc')?.value || 0);
       if (formulaCount > 0 && isBlank('fml')) missing.push('⑨ 회당 ml');
